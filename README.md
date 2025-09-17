@@ -28,3 +28,5 @@
                  [Optional Services]
                  - SendGrid (emails)   - Analytics: Plausible / PostHog OSS
                  - Cloudinary (image CDN/transform) - Twilio (SMS if needed)
+
+To be continued
