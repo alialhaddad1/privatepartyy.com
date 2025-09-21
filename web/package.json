@@ -1,0 +1,10 @@
+You are Claude Sonnet 4.0. Edit ONLY the file: web/package.json
+Context: The root package.json for the Next.js 14 app prototype.
+Requirements:
+- Name: "event-feed-prototype"
+- Private: true
+- Scripts: dev, build, start, lint
+- Dependencies: next@14, react, react-dom, @supabase/supabase-js, tailwindcss, autoprefixer, postcss, qrcode
+- DevDependencies: typescript, eslint, prettier
+- Include type: "module" and set engines.node >=18
+Return the complete file code.
