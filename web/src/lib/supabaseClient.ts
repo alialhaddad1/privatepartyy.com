@@ -1,12 +1,59 @@
-/*
-You are Claude Sonnet 4.0. Edit ONLY the file: web/src/lib/supabaseClient.ts
-Context: Initialize Supabase client for a Next.js 14 prototype. Will be used across server and client code.
-Tech stack: Next.js 14, TypeScript, Supabase.
-Requirements:
-- Import { createClient } from '@supabase/supabase-js'
-- Use env vars: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-- Export a singleton `supabase` client instance
-- Add TypeScript type definitions for the `posts` table and storage bucket
-- Ensure this client can be used in server components (edge runtime) and client components
-Return the complete file code.
-*/
+import { createClient } from '@supabase/supabase-js';
+
+// Environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// Type definitions for database tables
+export interface Event {
+  id: string;
+  name: string;
+  date: string;
+  location: string;
+  created_at: string;
+}
+
+export interface Post {
+  id: string;
+  event_id: string;
+  uploader_name: string;
+  image_url: string;
+  created_at: string;
+}
+
+// Database schema type
+export interface Database {
+  api: {
+    Tables: {
+      events: {
+        Row: Event;
+        Insert: Omit<Event, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<Event, 'id' | 'created_at'>>;
+      };
+      posts: {
+        Row: Post;
+        Insert: Omit<Post, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<Post, 'id' | 'created_at'>>;
+      };
+    };
+    Views: {};
+    Functions: {};
+    Enums: {};
+  };
+}
+
+// Create and export singleton Supabase client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false, // Better for server components
+  },
+});
+
+// Export default for convenience
+export default supabase;

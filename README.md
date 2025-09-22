@@ -38,10 +38,6 @@ posts SELECT/INSERT/DELETE allowed if exists (select 1 from event_guests where e
 Store tokens hashed (or opaque UUIDs) and use signed URLs for media.
 
 Media privacy & protections
-Important: On the web, you cannot reliably prevent screenshots. Explain to client:
-You can make right-click save harder (disable context menu, serve images via canvas or CSS background), add watermarks or overlay, and only provide low-resolution versions on web.
-You cannot stop OS-level screenshotting (iOS/Android or macOS/Windows) or screen capture.
-
 Image download prevention steps (prototype-level):
 Serve images via a dynamic canvas element so the image is not a straightforward <img src> (makes saving slightly more effort).
 Use signed short-lived image URLs so that links expire.

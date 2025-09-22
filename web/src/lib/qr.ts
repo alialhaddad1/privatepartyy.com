@@ -1,11 +1,46 @@
-/*
-You are Claude Sonnet 4.0. Edit ONLY the file: web/src/lib/qr.ts
-Context: This is a utility module that generates and scans QR codes. It will be used for routing users into specific event feeds based on the event_id encoded in the QR.
-Tech stack: Next.js 14, TypeScript, Supabase, TailwindCSS. Dependencies: qrcode, next/router.
-Requirements:
-- Export a function `generateQRCode(eventId: string): Promise<string>` that returns a data URL string of a QR code encoding `https://myapp.com/event/{eventId}`.
-- Export a function `parseQRCode(url: string): string | null` that extracts the eventId from a scanned QR link.
-- Handle errors gracefully (return null if QR cannot be parsed).
-Return the complete file code.
+import QRCode from 'qrcode';
 
-*/
+/**
+ * Generates a QR code data URL for the given event ID
+ * @param eventId - The event ID to encode in the QR code
+ * @returns Promise that resolves to a data URL string of the QR code
+ */
+export async function generateQRCode(eventId: string): Promise<string> {
+  try {
+    const url = `https://myapp.com/event/${eventId}`;
+    const dataUrl = await QRCode.toDataURL(url, {
+      width: 256,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    return dataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    throw new Error('Failed to generate QR code');
+  }
+}
+
+/**
+ * Extracts the event ID from a QR code URL
+ * @param url - The URL from a scanned QR code
+ * @returns The event ID if found, null otherwise
+ */
+export function parseQRCode(url: string): string | null {
+  try {
+    // Handle both full URLs and relative paths
+    const urlPattern = /(?:https?:\/\/[^\/]+)?\/event\/([^\/\?#]+)/i;
+    const match = url.match(urlPattern);
+    
+    if (match && match[1]) {
+      return match[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error parsing QR code URL:', error);
+    return null;
+  }
+}
