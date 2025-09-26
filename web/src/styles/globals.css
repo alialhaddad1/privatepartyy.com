@@ -1,13 +1,19 @@
-/*
-You are Claude Sonnet 4.0. Edit ONLY the file: web/src/styles/globals.css
-Context: Global CSS file for Next.js 14 + TailwindCSS app.
-Requirements:
-- Import Tailwind directives: @tailwind base; @tailwind components; @tailwind utilities;
-- Add base styles for html, body:
-  - font-family: system-ui, sans-serif
-  - background: #f9fafb
-  - text color: #111827
-- Add a utility class `.container` with max-width: 1200px and padding-inline: 1rem
-- Add smooth scrolling
-Return the complete file code.
-*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  font-family: system-ui, sans-serif;
+  background: #f9fafb;
+  color: #111827;
+}
+
+.container {
+  max-width: 1200px;
+  padding-inline: 1rem;
+}

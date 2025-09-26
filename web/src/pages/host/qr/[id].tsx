@@ -1,20 +1,161 @@
-/* 
-Task: Generate host QR page for PrivatePartyy.com in Next.js + TypeScript.
-File: src/pages/host/qr/[id].tsx
+import { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
+import { useState } from 'react';
+import Header from '../../../components/Header';
 
-Context:
-- Shows a unique QR code for an event.
-- Host can click a button to go to feed (/event/[id]).
-- Imports Header.tsx.
-- Uses QR display component (QRCodeDisplay.tsx) to render token.
-- GETs event info via /api/events/:id/qr using eventId from URL param.
-- Optional: Regenerate token via POST /api/events/:id/qr/regenerate.
+interface EventQRData {
+  id: string;
+  name: string;
+  token: string;
+  qrUrl: string;
+}
 
-Deliverable:
-- React functional component with getServerSideProps to fetch event info.
-- Display QR code with copy-to-clipboard.
-- Button to navigate to feed page.
-- Export default.
-- Return only code.
+interface HostQRPageProps {
+  event: EventQRData;
+  error?: string;
+}
 
-*/
+const HostQRPage: React.FC<HostQRPageProps> = ({ event, error }) => {
+  const router = useRouter();
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [currentToken, setCurrentToken] = useState(event?.token || '');
+  const [currentQrUrl, setCurrentQrUrl] = useState(event?.qrUrl || '');
+
+  const handleGoToFeed = () => {
+    router.push(`/event/${event.id}`);
+  };
+
+  const handleRegenerateToken = async () => {
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(`/api/events/${event.id}/qr/regenerate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentToken(data.token);
+        setCurrentQrUrl(data.qrUrl);
+      } else {
+        console.error('Failed to regenerate token');
+      }
+    } catch (err) {
+      console.error('Error regenerating token:', err);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+            <p className="text-gray-700">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Header />
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+          <h1 className="text-2xl font-bold text-center mb-2">{event.name}</h1>
+          <p className="text-gray-600 text-center mb-6">Event QR Code</p>
+          
+          <div className="mb-6">
+            <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
+              <div className="flex flex-col items-center">
+                <div className="bg-gray-100 p-4 rounded-lg mb-4">
+                  <img 
+                    src={currentQrUrl} 
+                    alt="Event QR Code"
+                    className="w-48 h-48"
+                  />
+                </div>
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Event Token
+                  </label>
+                  <div className="flex">
+                    <input
+                      type="text"
+                      value={currentToken}
+                      readOnly
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm"
+                    />
+                    <button
+                      onClick={() => navigator.clipboard.writeText(currentToken)}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 text-sm"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <button
+              onClick={handleGoToFeed}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+            >
+              Go to Event Feed
+            </button>
+
+            <button
+              onClick={handleRegenerateToken}
+              disabled={isRegenerating}
+              className="w-full bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+            >
+              {isRegenerating ? 'Regenerating...' : 'Regenerate QR Code'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const { id } = context.params!;
+  
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/events/${id}/qr`);
+    
+    if (!response.ok) {
+      return {
+        props: {
+          event: null,
+          error: 'Failed to fetch event QR data'
+        }
+      };
+    }
+
+    const event = await response.json();
+    
+    return {
+      props: {
+        event
+      }
+    };
+  } catch (error) {
+    return {
+      props: {
+        event: null,
+        error: 'Error fetching event data'
+      }
+    };
+  }
+};
+
+export default HostQRPage;

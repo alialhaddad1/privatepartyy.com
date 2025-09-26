@@ -1,10 +1,20 @@
-/*
-You are Claude Sonnet 4.0. Edit ONLY the file: web/src/pages/_app.tsx
-Context: Custom App component for Next.js pages router.
-Tech stack: Next.js 14 (pages dir still valid), TypeScript, TailwindCSS.
-Requirements:
-- Import global styles from ../styles/globals.css
-- Render <Component {...pageProps} />
-- Add a simple <Head> with title and meta description for the prototype
-Return the complete file code.
-*/
+import type { AppProps } from 'next/app';
+import Head from 'next/head';
+import '../styles/globals.css';
+
+export default function App({ Component, pageProps }: AppProps) {
+  return (
+    <>
+      <Head>
+        <title>PrivatePartyy - Connect & Share at Private Events</title>
+        <meta 
+          name="description" 
+          content="Join exclusive private parties and events. Connect with friends, share memories, and discover amazing experiences in your area." 
+        />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+      <Component {...pageProps} />
+    </>
+  );
+}
