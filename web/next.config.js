@@ -1,10 +1,30 @@
-/*
-You are Claude Sonnet 4.0. Edit ONLY the file: web/next.config.js
-Context: Config file for Next.js 14 project.
-Requirements:
-- Enable experimental appDir
-- Enable strict mode
-- Configure images domains to allow Supabase storage public URLs
-- Export default config
-Return the complete file code.
-*/
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    appDir: true
+  },
+  reactStrictMode: true,
+  images: {
+    domains: [
+      'supabase.co',
+      'supabase.com',
+      'amazonaws.com'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**'
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.com',
+        port: '',
+        pathname: '/storage/v1/object/public/**'
+      }
+    ]
+  }
+};
+
+module.exports = nextConfig;
