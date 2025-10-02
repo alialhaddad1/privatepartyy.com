@@ -1,9 +1,10 @@
 import { jest } from '@jest/globals';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import { JSDOM } from 'jsdom';
-import { generateQRCode, parseQRCode } from '../web/src/lib/qr';
-import QRScanner from '../web/src/components/QRScanner';
+import { generateQRCode, parseQRCode } from '../src/lib/qr';
+import QRScanner from '../src/components/QRScanner';
 
 // Mock the QR library functions
 jest.mock('../src/lib/qr', () => ({
@@ -105,7 +106,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
       const mockOnError = jest.fn();
 
       render(
-        <QRScanner 
+        <QRScanner
           onScan={mockOnScan}
           onError={mockOnError}
           isActive={true}
@@ -122,7 +123,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
       });
 
       // Simulate QR code detection by triggering the scan callback
-      const videoElement = screen.getByRole('img', { hidden: true }) || 
+      const videoElement = screen.getByRole('img', { hidden: true }) ||
                           document.querySelector('video');
 
       if (videoElement) {
@@ -140,7 +141,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
         // Trigger QR scan simulation
         fireEvent.loadedMetadata(videoElement);
-        
+
         // Wait for QR processing
         await waitFor(() => {
           expect(mockOnScan).toHaveBeenCalledWith(testEventId);
@@ -226,7 +227,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
       const mockOnError = jest.fn();
 
       render(
-        <QRScanner 
+        <QRScanner
           onScan={mockOnScan}
           onError={mockOnError}
           isActive={true}
@@ -244,21 +245,21 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
       // Simulate QR code detection
       const videoElement = document.querySelector('video');
-      
+
       if (videoElement) {
         // Mock QR detection process
         fireEvent.loadedMetadata(videoElement);
-        
+
         // Wait for scan completion
         await waitFor(() => {
           expect(mockOnScan).toHaveBeenCalledWith(testEventId);
         }, { timeout: 3000 });
       }
 
-      // Verify Android Chrome environment  
+      // Verify Android Chrome environment
       expect(global.navigator.userAgent).toContain('Android');
       expect(global.navigator.userAgent).toContain('Chrome');
-      
+
       // Verify same event ID is extracted
       expect(mockParseQRCode).toHaveBeenCalled();
     });
@@ -292,7 +293,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
         mockParseQRCode.mockResolvedValue(testEventId);
         const result = await mockParseQRCode(testQRUrl);
-        
+
         expect(result).toBe(testEventId);
       }
     });
@@ -308,7 +309,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
       mockParseQRCode.mockResolvedValue(testEventId);
       const iosResult = await mockParseQRCode(qrDataUrl);
 
-      // Test Android parsing  
+      // Test Android parsing
       mockParseQRCode.mockResolvedValue(testEventId);
       const androidResult = await mockParseQRCode(qrDataUrl);
 
@@ -361,9 +362,9 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
     it('should simulate photo upload on iOS (jpg) and assert success', async () => {
       // Create mock JPG file from iOS camera
       const mockIOSJpgFile = new File(
-        ['mock ios jpg image data'], 
-        'IMG_1234.jpg', 
-        { 
+        ['mock ios jpg image data'],
+        'IMG_1234.jpg',
+        {
           type: 'image/jpeg',
           lastModified: Date.now()
         }
@@ -420,8 +421,8 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
     it('should handle iOS HEIC to JPG conversion', async () => {
       const mockHEICFile = new File(
-        ['mock heic image data'], 
-        'IMG_5678.HEIC', 
+        ['mock heic image data'],
+        'IMG_5678.HEIC',
         { type: 'image/heic' }
       );
 
@@ -437,7 +438,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
         eventId: testEventId,
         convertToJPEG: true
       });
-      
+
       expect(uploadResult.success).toBe(true);
       expect(uploadResult.url).toContain('.jpg');
       expect(uploadResult.originalFormat).toBe('HEIC');
@@ -463,7 +464,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
         eventId: testEventId,
         autoRotate: true
       });
-      
+
       expect(uploadResult.success).toBe(true);
       expect(uploadResult.metadata.rotated).toBe(true);
       expect(uploadResult.metadata.orientation).toBe(6);
@@ -482,9 +483,9 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
     it('should simulate photo upload on Android (png) and assert success', async () => {
       // Create mock PNG file from Android camera
       const mockAndroidPngFile = new File(
-        ['mock android png image data'], 
-        '20240115_123456.png', 
-        { 
+        ['mock android png image data'],
+        '20240115_123456.png',
+        {
           type: 'image/png',
           lastModified: Date.now()
         }
@@ -542,8 +543,8 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
     it('should handle Android screenshot PNG uploads', async () => {
       const mockScreenshotFile = new File(
-        ['mock screenshot data'], 
-        'Screenshot_20240115_123456.png', 
+        ['mock screenshot data'],
+        'Screenshot_20240115_123456.png',
         { type: 'image/png' }
       );
 
@@ -561,7 +562,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
       const uploadResult = await mockUploadPhoto(mockScreenshotFile, {
         eventId: testEventId
       });
-      
+
       expect(uploadResult.success).toBe(true);
       expect(uploadResult.metadata.type).toBe('screenshot');
       expect(uploadResult.metadata.isScreenshot).toBe(true);
@@ -569,8 +570,8 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
     it('should handle Android gallery PNG selection', async () => {
       const mockGalleryFile = new File(
-        ['gallery png data'], 
-        'IMG_Gallery_001.png', 
+        ['gallery png data'],
+        'IMG_Gallery_001.png',
         { type: 'image/png' }
       );
 
@@ -589,7 +590,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
         eventId: testEventId,
         source: 'gallery'
       });
-      
+
       expect(uploadResult.success).toBe(true);
       expect(uploadResult.source).toBe('gallery');
       expect(uploadResult.metadata.source).toBe('gallery');
@@ -600,7 +601,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
     it('should complete full flow: scan QR → extract eventId → upload photo on iOS', async () => {
       // Step 1: Scan QR code and extract event ID
       mockParseQRCode.mockResolvedValue(testEventId);
-      
+
       const mockOnScan = jest.fn();
       render(<QRScanner onScan={mockOnScan} onError={jest.fn()} isActive={true} />);
 
@@ -613,7 +614,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
       // Step 2: Upload photo with extracted event ID
       const iosFile = new File(['ios photo'], 'photo.jpg', { type: 'image/jpeg' });
-      
+
       mockUploadPhoto.mockResolvedValue({
         success: true,
         eventId: testEventId,
@@ -635,7 +636,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
       // Step 1: Scan QR code
       mockParseQRCode.mockResolvedValue(testEventId);
-      
+
       const mockOnScan = jest.fn();
       render(<QRScanner onScan={mockOnScan} onError={jest.fn()} isActive={true} />);
 
@@ -645,7 +646,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
       // Step 2: Upload PNG photo
       const androidFile = new File(['android photo'], 'photo.png', { type: 'image/png' });
-      
+
       mockUploadPhoto.mockResolvedValue({
         success: true,
         eventId: testEventId,
@@ -663,7 +664,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
   describe('Error Handling Across Devices', () => {
     it('should handle QR scanning camera errors on iOS', async () => {
       mockMediaDevices.getUserMedia.mockRejectedValue(new Error('iOS camera access denied'));
-      
+
       const mockOnError = jest.fn();
       render(<QRScanner onScan={jest.fn()} onError={mockOnError} isActive={true} />);
 
@@ -674,7 +675,7 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
 
     it('should handle QR scanning errors on Android', async () => {
       mockMediaDevices.getUserMedia.mockRejectedValue(new Error('Android camera permission denied'));
-      
+
       const mockOnError = jest.fn();
       render(<QRScanner onScan={jest.fn()} onError={mockOnError} isActive={true} />);
 
@@ -686,18 +687,18 @@ describe('Cross-Device QR Scanning and Upload Tests', () => {
     it('should handle upload failures gracefully', async () => {
       // iOS upload failure
       mockUploadPhoto.mockRejectedValue(new Error('Upload failed'));
-      
+
       const iosFile = new File(['ios'], 'test.jpg', { type: 'image/jpeg' });
       await expect(mockUploadPhoto(iosFile)).rejects.toThrow('Upload failed');
 
-      // Android upload failure  
+      // Android upload failure
       const androidFile = new File(['android'], 'test.png', { type: 'image/png' });
       await expect(mockUploadPhoto(androidFile)).rejects.toThrow('Upload failed');
     });
 
     it('should handle invalid QR data parsing', async () => {
       mockParseQRCode.mockRejectedValue(new Error('Invalid QR data'));
-      
+
       const mockOnError = jest.fn();
       render(<QRScanner onScan={jest.fn()} onError={mockOnError} isActive={true} />);
 
