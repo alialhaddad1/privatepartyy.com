@@ -44,20 +44,20 @@ interface FeedPost {
 
 // Mock services
 const mockEventService = {
-  getEvent: jest.fn(),
-  validateEventDate: jest.fn(),
-  isEventExpired: jest.fn(),
-  fetchFeed: jest.fn(),
+  getEvent: jest.fn() as jest.MockedFunction<(eventId: string) => Promise<Event>>,
+  validateEventDate: jest.fn() as jest.MockedFunction<(event: Event) => boolean>,
+  isEventExpired: jest.fn() as jest.MockedFunction<(event: Event) => boolean>,
+  fetchFeed: jest.fn() as jest.MockedFunction<(eventId: string) => Promise<FeedPost[]>>,
 };
 
 const mockQRService = {
-  generateEventQRCode: jest.fn(),
-  validateEventForQR: jest.fn(),
+  generateEventQRCode: jest.fn() as jest.MockedFunction<(eventId: string) => Promise<string>>,
+  validateEventForQR: jest.fn() as jest.MockedFunction<(eventId: string) => Promise<Event>>,
 };
 
 // Mock Supabase client implementation
 const mockSupabaseClient = {
-  from: jest.fn(() => ({
+  from: jest.fn((table: string) => ({
     select: jest.fn(),
     insert: jest.fn(),
     update: jest.fn(),
@@ -66,7 +66,7 @@ const mockSupabaseClient = {
     lt: jest.fn(),
     gt: jest.fn(),
     single: jest.fn(),
-  }))
+  })) as jest.MockedFunction<(table: string) => any>
 };
 
 // Mock QR functions

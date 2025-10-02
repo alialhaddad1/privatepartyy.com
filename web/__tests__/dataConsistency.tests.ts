@@ -43,11 +43,18 @@ interface MockRemoveResponse {
   };
 }
 
+// Type definitions for upload service functions
+interface UploadResult {
+  success: boolean;
+  data: any;
+  storagePath: string;
+}
+
 // Mock upload service that handles the complete upload flow
 const mockUploadService = {
-  uploadPost: jest.fn(),
-  cleanupOrphanedFile: jest.fn(),
-  validateUpload: jest.fn(),
+  uploadPost: jest.fn() as jest.MockedFunction<(file: File, postData: any) => Promise<UploadResult>>,
+  cleanupOrphanedFile: jest.fn() as jest.MockedFunction<(filePath: string) => Promise<MockRemoveResponse>>,
+  validateUpload: jest.fn() as jest.MockedFunction<(file: File) => Promise<boolean>>,
 };
 
 // Mock Supabase client implementation
@@ -312,7 +319,7 @@ describe('Data Consistency Tests', () => {
 
     it('should handle multiple concurrent upload failures with proper cleanup', async () => {
       const concurrentUploads = 3;
-      const uploads: Promise<any>[] = [];
+      const uploads: Promise<UploadResult>[] = [];
 
       for (let i = 0; i < concurrentUploads; i++) {
         // Setup mocks for each upload
@@ -392,7 +399,7 @@ describe('Data Consistency Tests', () => {
       mockDatabaseInsert.mockResolvedValue(mockDatabaseSuccess);
 
       // Execute upload - should succeed
-      const result = await mockUploadService.uploadPost(testFile, testPostData);
+      const result: UploadResult = await mockUploadService.uploadPost(testFile, testPostData);
 
       // Assert successful result
       expect(result.success).toBe(true);
@@ -416,7 +423,7 @@ describe('Data Consistency Tests', () => {
 
     it('should handle multiple successful uploads without triggering cleanup', async () => {
       const successfulUploads = 5;
-      const uploads: Promise<any>[] = [];
+      const uploads: Promise<UploadResult>[] = [];
 
       for (let i = 0; i < successfulUploads; i++) {
         const mockStorageResponse: MockStorageResponse = {
@@ -497,7 +504,7 @@ describe('Data Consistency Tests', () => {
         mockDatabaseInsert.mockResolvedValue(mockDatabaseSuccess);
 
         const file = new File(['test'], testCase.fileName, { type: 'image/jpeg' });
-        const result = await mockUploadService.uploadPost(file, {
+        const result: UploadResult = await mockUploadService.uploadPost(file, {
           title: testCase.title,
           content: 'Test content',
           user_id: testCase.userId
@@ -599,13 +606,13 @@ describe('Data Consistency Tests', () => {
         }
 
         const dbResponse = await mockDatabaseInsert([{ ...postData, image_url: storageResponse.data.fullPath }]);
-        
+
         if (dbResponse.error || !dbResponse.data) {
           await mockUploadService.cleanupOrphanedFile(storageResponse.data.path);
           throw new Error('Database insert failed: No data returned');
         }
 
-        return { success: true, data: dbResponse.data[0] };
+        return { success: true, data: dbResponse.data[0], storagePath: storageResponse.data.path };
       });
 
       await expect(mockUploadService.uploadPost(testFile, testPostData))

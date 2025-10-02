@@ -84,12 +84,12 @@ describe('Storage Deletion Tests - Photo Expiry and Cleanup', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    mockStorageRemove.mockResolvedValue({ data: null, error: null });
+    (mockStorageRemove as any).mockResolvedValue({ data: null, error: null });
     mockPostsDb = [];
     logMessages.length = 0;
-    
+
     // Setup mock implementations
-    mockDbFrom.mockImplementation((table: string) => {
+    mockDbFrom.mockImplementation(((table: string) => {
       if (table === 'posts') {
         return {
           delete: jest.fn().mockReturnThis(),
@@ -102,7 +102,7 @@ describe('Storage Deletion Tests - Photo Expiry and Cleanup', () => {
         };
       }
       return {};
-    });
+    }) as any);
   });
 
   afterEach(() => {

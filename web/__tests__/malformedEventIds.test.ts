@@ -20,6 +20,33 @@ interface SecurityError {
   blocked: string;
 }
 
+// Error classes for throwing
+class ValidationErrorClass extends Error {
+  type: 'VALIDATION_ERROR';
+  field: string;
+  value?: string;
+
+  constructor(type: 'VALIDATION_ERROR', field: string, message: string, value?: string) {
+    super(message);
+    this.name = 'ValidationError';
+    this.type = type;
+    this.field = field;
+    this.value = value;
+  }
+}
+
+class SecurityErrorClass extends Error {
+  type: 'SECURITY_ERROR';
+  blocked: string;
+
+  constructor(type: 'SECURITY_ERROR', message: string, blocked: string) {
+    super(message);
+    this.name = 'SecurityError';
+    this.type = type;
+    this.blocked = blocked;
+  }
+}
+
 // Mock services for testing
 const mockEventService = {
   fetchFeed: jest.fn(),
@@ -52,30 +79,30 @@ describe('Malformed Event IDs Tests', () => {
     jest.clearAllMocks();
 
     // Setup default validation behavior
-    mockEventService.validateEventId.mockImplementation((eventId: string) => {
+    mockEventService.validateEventId.mockImplementation(((eventId: string) => {
       // Basic validation rules
       if (!eventId || typeof eventId !== 'string') {
-        throw new ValidationError('VALIDATION_ERROR', 'eventId', 'Event ID is required and must be a string');
+        throw new ValidationErrorClass('VALIDATION_ERROR', 'eventId', 'Event ID is required and must be a string');
       }
 
       if (eventId.length > 255) {
-        throw new ValidationError('VALIDATION_ERROR', 'eventId', 'Event ID too long (max 255 characters)');
+        throw new ValidationErrorClass('VALIDATION_ERROR', 'eventId', 'Event ID too long (max 255 characters)');
       }
 
       // Check for SQL injection patterns
       if (mockEventService.detectSQLInjection(eventId)) {
-        throw new SecurityError('SECURITY_ERROR', 'Potential SQL injection detected', eventId);
+        throw new SecurityErrorClass('SECURITY_ERROR', 'Potential SQL injection detected', eventId);
       }
 
       // Check for XSS patterns
       if (mockEventService.detectXSSAttempt(eventId)) {
-        throw new SecurityError('SECURITY_ERROR', 'Potential XSS attempt detected', eventId);
+        throw new SecurityErrorClass('SECURITY_ERROR', 'Potential XSS attempt detected', eventId);
       }
 
       return true;
-    });
+    }) as any);
 
-    mockEventService.detectSQLInjection.mockImplementation((input: string) => {
+    mockEventService.detectSQLInjection.mockImplementation(((input: string) => {
       const sqlPatterns = [
         /DROP\s+TABLE/i,
         /DELETE\s+FROM/i,
@@ -91,9 +118,9 @@ describe('Malformed Event IDs Tests', () => {
       ];
 
       return sqlPatterns.some(pattern => pattern.test(input));
-    });
+    }) as any);
 
-    mockEventService.detectXSSAttempt.mockImplementation((input: string) => {
+    mockEventService.detectXSSAttempt.mockImplementation(((input: string) => {
       const xssPatterns = [
         /<script[^>]*>/i,
         /<\/script>/i,
@@ -107,23 +134,23 @@ describe('Malformed Event IDs Tests', () => {
       ];
 
       return xssPatterns.some(pattern => pattern.test(input));
-    });
+    }) as any);
 
-    mockEventService.sanitizeEventId.mockImplementation((eventId: string) => {
+    mockEventService.sanitizeEventId.mockImplementation(((eventId: string) => {
       // Basic sanitization
       return eventId
         .replace(/[<>'"&]/g, '') // Remove dangerous HTML chars
         .replace(/[;]/g, '') // Remove semicolons
         .replace(/--/g, '') // Remove SQL comments
         .trim();
-    });
+    }) as any);
 
-    mockEventService.fetchFeed.mockImplementation(async (eventId: string) => {
+    mockEventService.fetchFeed.mockImplementation((async (eventId: string) => {
       try {
         // Validate and sanitize input
         mockEventService.validateEventId(eventId);
-        const sanitizedId = mockEventService.sanitizeEventId(eventId);
-        
+        const sanitizedId = mockEventService.sanitizeEventId(eventId) as string;
+
         // Mock successful feed fetch for valid IDs
         if (sanitizedId && sanitizedId.length > 0) {
           return [
@@ -136,14 +163,14 @@ describe('Malformed Event IDs Tests', () => {
             }
           ];
         }
-        
+
         throw new Error('Invalid event ID after sanitization');
       } catch (error) {
         throw error;
       }
-    });
+    }) as any);
 
-    mockQRService.validateQRInput.mockImplementation((eventId: string) => {
+    mockQRService.validateQRInput.mockImplementation(((eventId: string) => {
       // Similar validation for QR generation
       if (!eventId || typeof eventId !== 'string') {
         throw new Error('Event ID is required for QR generation');
@@ -159,13 +186,13 @@ describe('Malformed Event IDs Tests', () => {
       }
 
       return true;
-    });
+    }) as any);
 
-    mockQRService.generateEventQRCode.mockImplementation(async (eventId: string) => {
+    mockQRService.generateEventQRCode.mockImplementation((async (eventId: string) => {
       mockQRService.validateQRInput(eventId);
-      const sanitizedId = mockEventService.sanitizeEventId(eventId);
+      const sanitizedId = mockEventService.sanitizeEventId(eventId) as string;
       return await mockGenerateQRCode(`https://app.example.com/event/${sanitizedId}`);
-    });
+    }) as any);
 
     // Setup mock QR generation
     mockGenerateQRCode.mockResolvedValue('data:image/png;base64,mock-qr-code');
@@ -402,9 +429,9 @@ describe('Malformed Event IDs Tests', () => {
 
       for (const unicodeId of unicodeEventIds) {
         // Should be safely processed
-        const result = await mockEventService.fetchFeed(unicodeId);
+        const result = await mockEventService.fetchFeed(unicodeId) as Array<{ event_id: string }>;
         expect(result).toBeDefined();
-        
+
         // Should maintain Unicode integrity
         expect(result[0].event_id).toBeDefined();
       }
@@ -420,9 +447,9 @@ describe('Malformed Event IDs Tests', () => {
       ];
 
       // Mock Unicode normalization
-      mockSecurityUtils.normalizeUnicode.mockImplementation((input: string) => {
+      mockSecurityUtils.normalizeUnicode.mockImplementation(((input: string) => {
         return input.normalize('NFC'); // Canonical composition
-      });
+      }) as any);
 
       for (const variant of unicodeVariants) {
         const normalized = mockSecurityUtils.normalizeUnicode(variant);
@@ -583,7 +610,7 @@ describe('Malformed Event IDs Tests', () => {
         "event-123-test"
       ];
 
-      const results = [];
+      const results: Array<any> = [];
       for (const eventId of similarIds) {
         const result = await mockEventService.fetchFeed(eventId);
         results.push(result);
@@ -592,7 +619,7 @@ describe('Malformed Event IDs Tests', () => {
       }
 
       // All should succeed consistently
-      expect(results.every(r => r.length > 0)).toBe(true);
+      expect(results.every((r: any) => r.length > 0)).toBe(true);
     });
   });
 });

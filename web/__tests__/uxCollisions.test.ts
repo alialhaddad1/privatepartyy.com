@@ -78,7 +78,7 @@ const uploadPost = async (
   const fileName = `${eventId}/${postId}_${file.name}`;
 
   // Upload to storage
-  const storageResult = await mockStorageUpload(fileName, file);
+  const storageResult = await mockStorageUpload(fileName, file) as { data: any; error: any };
   if (storageResult.error) {
     throw new Error(`Storage upload failed: ${storageResult.error}`);
   }
@@ -93,7 +93,7 @@ const uploadPost = async (
     created_at: new Date().toISOString(),
   };
 
-  const dbResult = await mockDbInsert(post);
+  const dbResult = await mockDbInsert(post) as { data: any; error: any };
   if (dbResult.error) {
     throw new Error(`Database insert failed: ${dbResult.error}`);
   }
@@ -110,24 +110,24 @@ describe('UX Collisions Tests - Anonymous User Experience', () => {
     mockPostsDb = [];
 
     // Setup mock implementations
-    mockStorageUpload.mockResolvedValue({
+    (mockStorageUpload as any).mockResolvedValue({
       data: { path: 'some/path' },
       error: null,
     });
 
-    mockDbInsert.mockImplementation((post: Post) => {
+    mockDbInsert.mockImplementation(((post: Post) => {
       mockPostsDb.push(post);
       return Promise.resolve({ data: post, error: null });
-    });
+    }) as any);
 
-    mockDbFrom.mockImplementation((table: string) => {
+    mockDbFrom.mockImplementation(((table: string) => {
       if (table === 'posts') {
         return {
           insert: mockDbInsert,
         };
       }
       return {};
-    });
+    }) as any);
   });
 
   describe('Name Collision Tests', () => {
