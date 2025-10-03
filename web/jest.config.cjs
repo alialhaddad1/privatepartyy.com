@@ -1,0 +1,23 @@
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'jsdom',
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      tsconfig: {
+        jsx: 'react',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    }],
+  },
+  modulePathIgnorePatterns: [
+    '<rootDir>/\\.vscode/',
+    '<rootDir>/anaconda3/',
+    '<rootDir>/AppData/',
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/.next/',
+  ],
+};

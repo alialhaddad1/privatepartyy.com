@@ -276,10 +276,10 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
     postsEventC.forEach(post => mockDatabase.addPost(post));
 
     // Setup service implementations
-    mockEventService.fetchFeed.mockImplementation(async (eventId: string, userId?: string): Promise<Post[]> => {
+    (mockEventService.fetchFeed.mockImplementation as any)(async (eventId: any, userId?: any): Promise<Post[]> => {
       // Simulate database query with event isolation
       const posts = mockDatabase.getPostsForEvent(eventId, userId);
-      
+
       mockSelect.mockResolvedValueOnce({
         data: posts,
         error: null
@@ -289,12 +289,12 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       return result.data || [];
     });
 
-    mockEventService.validateEventAccess.mockImplementation((eventId: string, userId?: string): boolean => {
+    (mockEventService.validateEventAccess.mockImplementation as any)((eventId: any, userId?: any): boolean => {
       return mockDatabase.getPostsForEvent(eventId, userId).length >= 0; // Can access if returns array
     });
 
-    mockPrivacyService.filterPostsByPrivacy.mockImplementation((posts: Post[], userId?: string): Post[] => {
-      return posts.filter(post => {
+    (mockPrivacyService.filterPostsByPrivacy.mockImplementation as any)((posts: any, userId?: any): Post[] => {
+      return posts.filter((post: any) => {
         if (post.visibility === 'private' && post.user_id !== userId) {
           return false;
         }
@@ -302,13 +302,13 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       });
     });
 
-    mockPrivacyService.validateUserAccess.mockImplementation((eventId: string, userId?: string): boolean => {
+    (mockPrivacyService.validateUserAccess.mockImplementation as any)((eventId: any, userId?: any): boolean => {
       const posts = mockDatabase.getPostsForEvent(eventId, userId);
       return posts.length > 0 || mockDatabase.getAllPosts().some(p => p.event_id === eventId);
     });
 
-    mockPrivacyService.checkEventIsolation.mockImplementation((posts: Post[], expectedEventId: string): boolean => {
-      return posts.every(post => post.event_id === expectedEventId);
+    (mockPrivacyService.checkEventIsolation.mockImplementation as any)((posts: any, expectedEventId: any): boolean => {
+      return posts.every((post: any) => post.event_id === expectedEventId);
     });
   });
 
@@ -325,12 +325,12 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       const eventAFeed = await mockEventService.fetchFeed(eventAId, 'user-a1');
       
       // Assert only Event A posts are returned
-      expect(eventAFeed).toBeDefined();
+      expect((eventAFeed as any)).toBeDefined();
       expect(Array.isArray(eventAFeed)).toBe(true);
-      expect(eventAFeed.length).toBeGreaterThan(0);
-      
+      expect((eventAFeed as any).length).toBeGreaterThan(0);
+
       // Verify all posts belong to Event A
-      eventAFeed.forEach(post => {
+      (eventAFeed as any).forEach((post: any) => {
         expect(post.event_id).toBe(eventAId);
         expect(post.title).toContain('Event A');
       });
@@ -338,10 +338,10 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       // Verify no Event B or C posts leaked
       const eventBPostIds = postsEventB.map(p => p.id);
       const eventCPostIds = postsEventC.map(p => p.id);
-      const returnedPostIds = eventAFeed.map(p => p.id);
+      const returnedPostIds = (eventAFeed as any).map((p: any) => p.id);
 
-      expect(returnedPostIds.some(id => eventBPostIds.includes(id))).toBe(false);
-      expect(returnedPostIds.some(id => eventCPostIds.includes(id))).toBe(false);
+      expect(returnedPostIds.some((id: any) => eventBPostIds.includes(id))).toBe(false);
+      expect(returnedPostIds.some((id: any) => eventCPostIds.includes(id))).toBe(false);
 
       // Verify isolation check
       expect(mockPrivacyService.checkEventIsolation(eventAFeed, eventAId)).toBe(true);
@@ -363,7 +363,7 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       expect(eventBFeed).toHaveLength(postsEventB.length);
       
       // Verify all posts belong to Event B
-      eventBFeed.forEach(post => {
+      (eventBFeed as any).forEach((post: any) => {
         expect(post.event_id).toBe(eventBId);
         expect(post.title).toContain('Event B');
       });
@@ -371,10 +371,10 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       // Verify no Event A or C posts leaked
       const eventAPostIds = postsEventA.map(p => p.id);
       const eventCPostIds = postsEventC.map(p => p.id);
-      const returnedPostIds = eventBFeed.map(p => p.id);
+      const returnedPostIds = (eventBFeed as any).map((p: any) => p.id);
 
-      expect(returnedPostIds.some(id => eventAPostIds.includes(id))).toBe(false);
-      expect(returnedPostIds.some(id => eventCPostIds.includes(id))).toBe(false);
+      expect(returnedPostIds.some((id: any) => eventAPostIds.includes(id))).toBe(false);
+      expect(returnedPostIds.some((id: any) => eventCPostIds.includes(id))).toBe(false);
 
       // Verify isolation check
       expect(mockPrivacyService.checkEventIsolation(eventBFeed, eventBId)).toBe(true);
@@ -395,19 +395,19 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       ]);
 
       // Verify Event A isolation
-      expect(eventAFeed.every(post => post.event_id === eventAId)).toBe(true);
+      expect((eventAFeed as any).every((post: any) => post.event_id === eventAId)).toBe(true);
       expect(mockPrivacyService.checkEventIsolation(eventAFeed, eventAId)).toBe(true);
 
       // Verify Event B isolation
-      expect(eventBFeed.every(post => post.event_id === eventBId)).toBe(true);
+      expect((eventBFeed as any).every((post: any) => post.event_id === eventBId)).toBe(true);
       expect(mockPrivacyService.checkEventIsolation(eventBFeed, eventBId)).toBe(true);
 
       // Verify no cross-contamination
-      const eventAPostIds = eventAFeed.map(p => p.id);
-      const eventBPostIds = eventBFeed.map(p => p.id);
-      
-      expect(eventAPostIds.some(id => eventBPostIds.includes(id))).toBe(false);
-      expect(eventBPostIds.some(id => eventAPostIds.includes(id))).toBe(false);
+      const eventAPostIds = (eventAFeed as any).map((p: any) => p.id);
+      const eventBPostIds = (eventBFeed as any).map((p: any) => p.id);
+
+      expect(eventAPostIds.some((id: any) => eventBPostIds.includes(id))).toBe(false);
+      expect(eventBPostIds.some((id: any) => eventAPostIds.includes(id))).toBe(false);
 
       // Verify both queries were made
       expect(mockSelect).toHaveBeenCalledTimes(2);
@@ -423,22 +423,22 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
 
       for (const maliciousEventId of maliciousQueries) {
         // Mock service should sanitize and only return legitimate results
-        mockEventService.fetchFeed.mockImplementation(async (eventId: string) => {
+        (mockEventService.fetchFeed.mockImplementation as any)(async (eventId: any) => {
           // Proper sanitization - only exact matches allowed
           const sanitizedEventId = eventId.replace(/[^a-zA-Z0-9\-_]/g, '');
           return mockDatabase.getPostsForEvent(sanitizedEventId);
         });
 
         const result = await mockEventService.fetchFeed(maliciousEventId);
-        
+
         // Should either return empty or only posts from the base event
-        if (result.length > 0) {
-          const uniqueEventIds = new Set(result.map(p => p.event_id));
+        if ((result as any).length > 0) {
+          const uniqueEventIds = new Set((result as any).map((p: any) => p.event_id));
           expect(uniqueEventIds.size).toBeLessThanOrEqual(1);
-          
+
           // Should not contain posts from other events
-          expect(result.every(post => 
-            post.event_id.startsWith('event-a-123') || 
+          expect((result as any).every((post: any) =>
+            post.event_id.startsWith('event-a-123') ||
             post.event_id === 'event-a-123'
           )).toBe(true);
         }
@@ -459,14 +459,14 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
 
       for (const wrongEventId of nonExistentEventIds) {
         const result = await mockEventService.fetchFeed(wrongEventId);
-        
+
         // Should return empty array for non-existent events
-        expect(result).toBeDefined();
+        expect((result as any)).toBeDefined();
         expect(Array.isArray(result)).toBe(true);
-        expect(result).toHaveLength(0);
-        
+        expect((result as any)).toHaveLength(0);
+
         // Verify no posts leaked
-        expect(result.every(post => post.event_id === wrongEventId)).toBe(true);
+        expect((result as any).every((post: any) => post.event_id === wrongEventId)).toBe(true);
       }
     });
 
@@ -493,13 +493,13 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
 
       for (const authorizedUser of authorizedUsers) {
         const result = await mockEventService.fetchFeed(privateEventId, authorizedUser);
-        
+
         if (authorizedUser === 'owner-c' || ['user-c1', 'user-c2'].includes(authorizedUser)) {
           // Authorized users should see posts
-          expect(result.length).toBeGreaterThanOrEqual(0);
-          
+          expect((result as any).length).toBeGreaterThanOrEqual(0);
+
           // All posts should belong to the private event
-          result.forEach(post => {
+          (result as any).forEach((post: any) => {
             expect(post.event_id).toBe(privateEventId);
           });
         }
@@ -517,10 +517,10 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
 
       for (const maliciousUserId of maliciousUserIds) {
         const result = await mockEventService.fetchFeed(eventAId, maliciousUserId);
-        
+
         // Should not leak posts from other events regardless of user ID manipulation
-        if (result.length > 0) {
-          expect(result.every(post => post.event_id === eventAId)).toBe(true);
+        if ((result as any).length > 0) {
+          expect((result as any).every((post: any) => post.event_id === eventAId)).toBe(true);
           expect(mockPrivacyService.checkEventIsolation(result, eventAId)).toBe(true);
         }
       }
@@ -533,12 +533,12 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       
       // User who owns private post
       const ownerResult = await mockEventService.fetchFeed(eventAId, 'user-a1');
-      const ownerPrivatePosts = ownerResult.filter(post => post.visibility === 'private');
+      const ownerPrivatePosts = (ownerResult as any).filter((post: any) => post.visibility === 'private');
       expect(ownerPrivatePosts.length).toBeGreaterThan(0);
-      
+
       // User who doesn't own private post
       const nonOwnerResult = await mockEventService.fetchFeed(eventAId, 'user-a2');
-      const nonOwnerPrivatePosts = nonOwnerResult.filter(post => 
+      const nonOwnerPrivatePosts = (nonOwnerResult as any).filter((post: any) =>
         post.visibility === 'private' && post.user_id !== 'user-a2'
       );
       expect(nonOwnerPrivatePosts.length).toBe(0);
@@ -552,31 +552,31 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       
       // User in the event should see event-only posts
       const eventUserResult = await mockEventService.fetchFeed(eventAId, 'user-a2');
-      const eventOnlyPosts = eventUserResult.filter(post => post.visibility === 'event-only');
+      const eventOnlyPosts = (eventUserResult as any).filter((post: any) => post.visibility === 'event-only');
       expect(eventOnlyPosts.length).toBeGreaterThan(0);
-      
+
       // Verify all returned posts belong to the correct event
-      expect(eventUserResult.every(post => post.event_id === eventAId)).toBe(true);
+      expect((eventUserResult as any).every((post: any) => post.event_id === eventAId)).toBe(true);
     });
 
     it('should maintain user context across privacy levels', async () => {
       const testUsers = ['user-a1', 'user-a2', 'user-b1'];
       const eventAId = 'event-a-123';
       
-      const userResults: { [key: string]: Post[] } = {};
-      
+      const userResults: { [key: string]: any } = {};
+
       for (const user of testUsers) {
-        userResults[user] = await mockEventService.fetchFeed(eventAId, user);
+        userResults[user] = await mockEventService.fetchFeed(eventAId, user) as any;
       }
       
       // User A1 should see their own private posts
-      const userA1PrivatePosts = userResults['user-a1'].filter(post => 
+      const userA1PrivatePosts = userResults['user-a1'].filter((post: any) =>
         post.visibility === 'private' && post.user_id === 'user-a1'
       );
       expect(userA1PrivatePosts.length).toBeGreaterThan(0);
-      
+
       // User A2 should not see A1's private posts
-      const userA2SeeingA1Private = userResults['user-a2'].filter(post => 
+      const userA2SeeingA1Private = userResults['user-a2'].filter((post: any) =>
         post.visibility === 'private' && post.user_id === 'user-a1'
       );
       expect(userA2SeeingA1Private.length).toBe(0);
@@ -650,7 +650,7 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
         const userId = `stress-user-${i}`;
         
         requestPromises.push(
-          mockEventService.fetchFeed(eventId, userId).then(result => ({
+          (mockEventService.fetchFeed as any)(eventId, userId).then((result: any) => ({
             eventId,
             userId,
             posts: result
@@ -662,16 +662,16 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       
       // Verify isolation maintained under stress
       for (const result of results) {
-        expect(result.posts).toBeDefined();
-        expect(Array.isArray(result.posts)).toBe(true);
-        
+        expect((result as any).posts).toBeDefined();
+        expect(Array.isArray((result as any).posts)).toBe(true);
+
         // All posts should belong to requested event
-        result.posts.forEach(post => {
-          expect(post.event_id).toBe(result.eventId);
+        (result as any).posts.forEach((post: any) => {
+          expect(post.event_id).toBe((result as any).eventId);
         });
-        
+
         // Verify isolation
-        expect(mockPrivacyService.checkEventIsolation(result.posts, result.eventId)).toBe(true);
+        expect(mockPrivacyService.checkEventIsolation((result as any).posts, (result as any).eventId)).toBe(true);
       }
     });
 
@@ -687,14 +687,14 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
 
       for (const maliciousEventId of securityViolationAttempts) {
         const result = await mockEventService.fetchFeed(maliciousEventId);
-        
+
         // Should return safe/empty result
-        expect(result).toBeDefined();
+        expect((result as any)).toBeDefined();
         expect(Array.isArray(result)).toBe(true);
-        
+
         // If any posts returned, they should be properly isolated
-        if (result.length > 0) {
-          const uniqueEventIds = new Set(result.map(p => p.event_id));
+        if ((result as any).length > 0) {
+          const uniqueEventIds = new Set((result as any).map((p: any) => p.event_id));
           expect(uniqueEventIds.size).toBeLessThanOrEqual(1);
         }
       }
@@ -707,7 +707,7 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
       const result = await mockEventService.fetchFeed(eventAId, 'user-a1');
 
       // Verify data structure integrity
-      result.forEach(post => {
+      (result as any).forEach((post: any) => {
         expect(post).toHaveProperty('id');
         expect(post).toHaveProperty('title');
         expect(post).toHaveProperty('content');
@@ -723,7 +723,7 @@ describe('Privacy Leakage and Event Isolation Tests', () => {
         expect(typeof post.event_id).toBe('string');
         expect(typeof post.user_id).toBe('string');
         expect(typeof post.created_at).toBe('string');
-        
+
         // Verify event ID matches request
         expect(post.event_id).toBe(eventAId);
       });

@@ -136,7 +136,7 @@ describe('Performance Tests', () => {
     mockSupabaseClient.from.mockReturnValue(mockQueryChain);
     
     // Setup mock post generation
-    mockPhotoService.generateMockPost.mockImplementation((index: number, eventId: string, userId: string): Post => ({
+    (mockPhotoService.generateMockPost.mockImplementation as any)((index: any, eventId: any, userId: any): Post => ({
       id: `post-${index}`,
       title: `Performance Test Photo ${index}`,
       content: `This is test photo number ${index} for performance testing`,
@@ -150,20 +150,20 @@ describe('Performance Tests', () => {
     }));
     
     // Setup upload service
-    mockPhotoService.uploadPhoto.mockImplementation(async (postData: Partial<Post>): Promise<UploadResult> => {
+    (mockPhotoService.uploadPhoto.mockImplementation as any)(async (postData: any): Promise<UploadResult> => {
       const startTime = performance.now();
-      
+
       // Simulate upload processing time (random 10-50ms)
       await new Promise(resolve => setTimeout(resolve, 10 + Math.random() * 40));
-      
+
       const mockResponse: BulkInsertResponse = {
         data: [postData as Post],
         error: null
       };
-      
+
       await mockInsert([postData]);
       const endTime = performance.now();
-      
+
       return {
         success: true,
         post: postData as Post,
@@ -172,28 +172,28 @@ describe('Performance Tests', () => {
     });
     
     // Setup batch upload service
-    mockPhotoService.uploadBatchPhotos.mockImplementation(async (posts: Partial<Post>[]): Promise<UploadResult[]> => {
+    (mockPhotoService.uploadBatchPhotos.mockImplementation as any)(async (posts: any): Promise<UploadResult[]> => {
       const batchSize = 10; // Process in batches of 10
       const results: UploadResult[] = [];
-      
+
       for (let i = 0; i < posts.length; i += batchSize) {
         const batch = posts.slice(i, i + batchSize);
         const startTime = performance.now();
-        
+
         // Mock successful batch insert
         mockInsert.mockResolvedValueOnce({
           data: batch,
           error: null
         });
-        
+
         await mockInsert(batch);
-        
+
         // Simulate batch processing time
         await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 30));
-        
+
         const endTime = performance.now();
         const batchTime = endTime - startTime;
-        
+
         // Add batch results
         for (const post of batch) {
           results.push({
@@ -203,51 +203,51 @@ describe('Performance Tests', () => {
           });
         }
       }
-      
+
       return results;
     });
     
     // Setup fetch service
-    mockEventService.fetchPostsForEvent.mockImplementation(async (eventId: string, limit?: number): Promise<Post[]> => {
+    (mockEventService.fetchPostsForEvent.mockImplementation as any)(async (eventId: any, limit?: any): Promise<Post[]> => {
       const postsToGenerate = limit || 500;
       const mockPosts: Post[] = [];
-      
+
       for (let i = 0; i < postsToGenerate; i++) {
-        mockPosts.push(mockPhotoService.generateMockPost(i, eventId, `user-${i % 50}`)); // 50 different users
+        mockPosts.push((mockPhotoService.generateMockPost as any)(i, eventId, `user-${i % 50}`)); // 50 different users
       }
-      
+
       // Mock database response
       mockSelect.mockResolvedValueOnce({
         data: mockPosts,
         error: null
       });
-      
+
       const result = await mockSelect('*');
       return result.data || [];
     });
     
     // Setup paginated fetch
-    mockEventService.fetchPostsPaginated.mockImplementation(async (
-      eventId: string, 
-      page: number = 0, 
-      pageSize: number = 50
+    (mockEventService.fetchPostsPaginated.mockImplementation as any)(async (
+      eventId: any,
+      page: any = 0,
+      pageSize: any = 50
     ): Promise<Post[]> => {
       const totalPosts = 500;
       const startIndex = page * pageSize;
       const endIndex = Math.min(startIndex + pageSize, totalPosts);
-      
+
       const mockPosts: Post[] = [];
       for (let i = startIndex; i < endIndex; i++) {
         if (i < totalPosts) {
-          mockPosts.push(mockPhotoService.generateMockPost(i, eventId, `user-${i % 50}`));
+          mockPosts.push((mockPhotoService.generateMockPost as any)(i, eventId, `user-${i % 50}`));
         }
       }
-      
+
       mockSelect.mockResolvedValueOnce({
         data: mockPosts,
         error: null
       });
-      
+
       const result = await mockSelect('*');
       return result.data || [];
     });
@@ -264,7 +264,7 @@ describe('Performance Tests', () => {
       
       // Generate test photos
       for (let i = 0; i < photoCount; i++) {
-        photosToUpload.push(mockPhotoService.generateMockPost(i, testEventId, testUserId));
+        photosToUpload.push((mockPhotoService.generateMockPost as any)(i, testEventId, testUserId));
       }
       
       console.log(`Starting upload of ${photoCount} photos...`);
@@ -272,15 +272,15 @@ describe('Performance Tests', () => {
       // Measure upload performance
       const { result: uploadResults, duration: uploadDuration } = await performanceTracker.measure(
         'bulk-upload',
-        () => mockPhotoService.uploadBatchPhotos(photosToUpload)
+        () => (mockPhotoService.uploadBatchPhotos as any)(photosToUpload)
       );
-      
+
       // Assert all uploads succeeded
-      expect(uploadResults).toHaveLength(photoCount);
-      expect(uploadResults.every(result => result.success)).toBe(true);
-      
+      expect((uploadResults as any)).toHaveLength(photoCount);
+      expect((uploadResults as any).every((result: any) => result.success)).toBe(true);
+
       // Verify all posts have valid data
-      uploadResults.forEach((result, index) => {
+      (uploadResults as any).forEach((result: any, index: any) => {
         expect(result.post).toBeDefined();
         expect(result.post.id).toBe(`post-${index}`);
         expect(result.post.event_id).toBe(testEventId);
@@ -296,7 +296,7 @@ describe('Performance Tests', () => {
       expect(mockInsert).toHaveBeenCalledTimes(Math.ceil(photoCount / 10)); // 10 batches of 10
       
       // Calculate average upload time per photo
-      const totalUploadTime = uploadResults.reduce((sum, result) => sum + result.uploadTime, 0);
+      const totalUploadTime = (uploadResults as any).reduce((sum: any, result: any) => sum + result.uploadTime, 0);
       const averageUploadTime = totalUploadTime / photoCount;
       console.log(`Average upload time per photo: ${averageUploadTime.toFixed(2)}ms`);
       expect(averageUploadTime).toBeLessThan(100); // Should average under 100ms per photo
@@ -315,10 +315,10 @@ describe('Performance Tests', () => {
         
         for (let i = 0; i < photosPerBatch; i++) {
           const globalIndex = batch * photosPerBatch + i;
-          batchPhotos.push(mockPhotoService.generateMockPost(globalIndex, testEventId, `user-batch-${batch}`));
+          batchPhotos.push((mockPhotoService.generateMockPost as any)(globalIndex, testEventId, `user-batch-${batch}`));
         }
-        
-        uploadPromises.push(mockPhotoService.uploadBatchPhotos(batchPhotos));
+
+        uploadPromises.push((mockPhotoService.uploadBatchPhotos as any)(batchPhotos));
       }
       
       console.log(`Starting ${concurrentBatches} concurrent upload batches...`);
@@ -352,25 +352,25 @@ describe('Performance Tests', () => {
       
       // Generate larger mock posts with more data
       for (let i = 0; i < largePhotoCount; i++) {
-        const largePost = mockPhotoService.generateMockPost(i, testEventId, testUserId);
-        largePost.content = 'Large content: ' + 'x'.repeat(1000); // Larger content
-        largePost.file_size = 1024 * 1024 * 5; // 5MB files
+        const largePost = (mockPhotoService.generateMockPost as any)(i, testEventId, testUserId);
+        (largePost as any).content = 'Large content: ' + 'x'.repeat(1000); // Larger content
+        (largePost as any).file_size = 1024 * 1024 * 5; // 5MB files
         largePhotos.push(largePost);
       }
-      
+
       const startMemory = process.memoryUsage().heapUsed;
-      
+
       const { result: uploadResults, duration: uploadDuration } = await performanceTracker.measure(
         'memory-pressure-upload',
-        () => mockPhotoService.uploadBatchPhotos(largePhotos)
+        async () => (mockPhotoService.uploadBatchPhotos as any)(largePhotos)
       );
-      
+
       const endMemory = process.memoryUsage().heapUsed;
       const memoryIncrease = endMemory - startMemory;
-      
+
       // Assert successful uploads
-      expect(uploadResults).toHaveLength(largePhotoCount);
-      expect(uploadResults.every(result => result.success)).toBe(true);
+      expect((uploadResults as any)).toHaveLength(largePhotoCount);
+      expect((uploadResults as any).every((result: any) => result.success)).toBe(true);
       
       // Performance and memory assertions
       console.log(`Large upload completed in ${uploadDuration.toFixed(2)}ms`);
@@ -400,7 +400,7 @@ describe('Performance Tests', () => {
       expect(posts).toHaveLength(expectedPostCount);
       
       // Verify post data integrity
-      posts.forEach((post, index) => {
+      (posts as any).forEach((post: any, index: any) => {
         expect(post.id).toBe(`post-${index}`);
         expect(post.event_id).toBe(testEventId);
         expect(post.image_url).toBeTruthy();
@@ -438,11 +438,11 @@ describe('Performance Tests', () => {
         const pageTime = pageEndTime - pageStartTime;
         pageTimings.push(pageTime);
         
-        allPosts.push(...pagePosts);
-        
+        allPosts.push(...(pagePosts as any));
+
         // Each page should be reasonably fast
         expect(pageTime).toBeLessThan(200); // Each page under 200ms
-        expect(pagePosts.length).toBeLessThanOrEqual(pageSize);
+        expect((pagePosts as any).length).toBeLessThanOrEqual(pageSize);
       }
       
       const overallEndTime = performance.now();
@@ -469,34 +469,34 @@ describe('Performance Tests', () => {
       const complexQueryPostCount = 500;
       
       // Mock complex query with filtering, sorting, and aggregation
-      mockEventService.fetchPostsForEvent.mockImplementation(async (eventId: string, limit?: number) => {
+      (mockEventService.fetchPostsForEvent.mockImplementation as any)(async (eventId: any, limit?: any) => {
         const postsToGenerate = limit || complexQueryPostCount;
         const mockPosts: Post[] = [];
-        
+
         // Generate posts with varied data for complex filtering
         for (let i = 0; i < postsToGenerate; i++) {
-          const post = mockPhotoService.generateMockPost(i, eventId, `user-${i % 20}`);
-          post.file_size = 1024 * 1024 * (1 + (i % 5)); // Varied file sizes
+          const post = (mockPhotoService.generateMockPost as any)(i, eventId, `user-${i % 20}`);
+          (post as any).file_size = 1024 * 1024 * (1 + (i % 5)); // Varied file sizes
           mockPosts.push(post);
         }
-        
+
         // Simulate complex database operations
         await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100)); // 50-150ms
-        
+
         mockSelect.mockResolvedValueOnce({
           data: mockPosts,
           error: null
         });
-        
+
         const result = await mockSelect('*, users!posts_user_id_fkey(*)');
         return result.data || [];
       });
-      
+
       console.log('Starting complex query fetch...');
-      
+
       const { result: posts, duration: fetchDuration } = await performanceTracker.measure(
         'complex-fetch',
-        () => mockEventService.fetchPostsForEvent(testEventId, complexQueryPostCount)
+        async () => mockEventService.fetchPostsForEvent(testEventId, complexQueryPostCount)
       );
       
       // Assert results
@@ -549,24 +549,24 @@ describe('Performance Tests', () => {
       // Phase 1: Upload photos
       const photosToUpload: Partial<Post>[] = [];
       for (let i = 0; i < photoCount; i++) {
-        photosToUpload.push(mockPhotoService.generateMockPost(i, testEventId, testUserId));
+        photosToUpload.push((mockPhotoService.generateMockPost as any)(i, testEventId, testUserId));
       }
-      
+
       console.log('Starting end-to-end workflow...');
       const workflowStartTime = performance.now();
-      
+
       // Upload phase
-      const uploadResults = await mockPhotoService.uploadBatchPhotos(photosToUpload);
-      
+      const uploadResults = await (mockPhotoService.uploadBatchPhotos as any)(photosToUpload);
+
       // Phase 2: Fetch posts (including newly uploaded)
       const fetchedPosts = await mockEventService.fetchPostsForEvent(testEventId, fetchCount);
-      
+
       const workflowEndTime = performance.now();
       const totalWorkflowTime = workflowEndTime - workflowStartTime;
-      
+
       // Assert workflow success
-      expect(uploadResults).toHaveLength(photoCount);
-      expect(uploadResults.every(result => result.success)).toBe(true);
+      expect((uploadResults as any)).toHaveLength(photoCount);
+      expect((uploadResults as any).every((result: any) => result.success)).toBe(true);
       expect(fetchedPosts).toHaveLength(fetchCount);
       
       // Performance assertions
@@ -592,10 +592,10 @@ describe('Performance Tests', () => {
         const iterationPhotos: Partial<Post>[] = [];
         for (let i = 0; i < photosPerIteration; i++) {
           const globalIndex = iteration * photosPerIteration + i;
-          iterationPhotos.push(mockPhotoService.generateMockPost(globalIndex, testEventId, `user-iter-${iteration}`));
+          iterationPhotos.push((mockPhotoService.generateMockPost as any)(globalIndex, testEventId, `user-iter-${iteration}`));
         }
-        
-        const uploadResults = await mockPhotoService.uploadBatchPhotos(iterationPhotos);
+
+        const uploadResults = await (mockPhotoService.uploadBatchPhotos as any)(iterationPhotos);
         
         // Fetch some posts
         const fetchedPosts = await mockEventService.fetchPostsForEvent(testEventId, 50);
@@ -648,12 +648,12 @@ describe('Performance Tests', () => {
       for (const operation of testOperations) {
         const photos: Partial<Post>[] = [];
         for (let i = 0; i < operation.photos; i++) {
-          photos.push(mockPhotoService.generateMockPost(i, testEventId, testUserId));
+          photos.push((mockPhotoService.generateMockPost as any)(i, testEventId, testUserId));
         }
-        
+
         const { result, duration } = await performanceTracker.measure(
           operation.name,
-          () => mockPhotoService.uploadBatchPhotos(photos)
+          async () => (mockPhotoService.uploadBatchPhotos as any)(photos)
         );
         
         const throughput = operation.photos / (duration / 1000); // Photos per second

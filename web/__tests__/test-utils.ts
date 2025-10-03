@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Minimal testing utilities to avoid heavy dependencies
 import React from 'react';
 import ReactDOM from 'react-dom/client';

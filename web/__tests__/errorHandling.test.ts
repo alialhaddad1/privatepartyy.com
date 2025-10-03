@@ -105,7 +105,7 @@ describe('Error Handling Tests', () => {
     });
 
     // Setup upload service error handling
-    mockUploadService.uploadFile.mockImplementation(async (file: File, path: string) => {
+    (mockUploadService.uploadFile.mockImplementation as any)(async (file: any, path: any) => {
       try {
         const result = await mockStorageUpload(path, file);
         if (result.error) {
@@ -114,7 +114,7 @@ describe('Error Handling Tests', () => {
         return { success: true, data: result.data };
       } catch (error) {
         return mockUploadService.handleStorageError(error);
-      }
+      } 
     });
 
     mockUploadService.createPost.mockImplementation(async (postData: any) => {
@@ -131,7 +131,7 @@ describe('Error Handling Tests', () => {
       }
     });
 
-    mockUploadService.handleStorageError.mockImplementation((error: StorageError) => {
+    (mockUploadService.handleStorageError.mockImplementation as any)((error: any) => {
       mockUploadService.logError('Storage operation failed', error);
       return {
         success: false,
@@ -143,18 +143,18 @@ describe('Error Handling Tests', () => {
       };
     });
 
-    mockUploadService.handleDatabaseError.mockImplementation((error: DatabaseError) => {
+    (mockUploadService.handleDatabaseError.mockImplementation as any)((error: any) => {
       return {
         success: false,
         error: {
-          type: 'DATABASE_ERROR', 
+          type: 'DATABASE_ERROR',
           message: 'Unable to save data. Please try again.',
           originalError: error.message
         }
       };
     });
 
-    mockUploadService.logError.mockImplementation((message: string, error: any) => {
+    (mockUploadService.logError.mockImplementation as any)((message: any, error: any) => {
       console.error(`[ERROR] ${message}:`, error);
     });
   });
@@ -178,11 +178,11 @@ describe('Error Handling Tests', () => {
       const result = await mockUploadService.uploadFile(testFile, 'uploads/test-file.jpg');
 
       // Assert graceful error handling
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error.type).toBe('STORAGE_ERROR');
-      expect(result.error.message).toBe('File upload failed. Please try again.');
-      expect(result.error.originalError).toBe('Network request failed');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error).toBeDefined();
+      expect((result as any).error.type).toBe('STORAGE_ERROR');
+      expect((result as any).error.message).toBe('File upload failed. Please try again.');
+      expect((result as any).error.originalError).toBe('Network request failed');
 
       // Assert error was logged
       expect(mockUploadService.logError).toHaveBeenCalledWith('Storage operation failed', networkError);
@@ -204,9 +204,9 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.uploadFile(testFile, 'uploads/large-file.jpg');
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('STORAGE_ERROR');
-      expect(result.error.message).toBe('File upload failed. Please try again.');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('STORAGE_ERROR');
+      expect((result as any).error.message).toBe('File upload failed. Please try again.');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Storage operation failed', quotaError);
     });
 
@@ -222,9 +222,9 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.uploadFile(testFile, 'uploads/test-file.jpg');
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('STORAGE_ERROR');
-      expect(result.error.originalError).toBe('Invalid JWT token');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('STORAGE_ERROR');
+      expect((result as any).error.originalError).toBe('Invalid JWT token');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Storage operation failed', authError);
     });
 
@@ -244,8 +244,8 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.uploadFile(testFile, 'uploads/slow-upload.jpg');
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('STORAGE_ERROR');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('STORAGE_ERROR');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Storage operation failed', timeoutError);
     });
 
@@ -265,8 +265,8 @@ describe('Error Handling Tests', () => {
       const invalidFile = new File(['malicious'], 'malicious.exe', { type: 'application/exe' });
       const result = await mockUploadService.uploadFile(invalidFile, 'uploads/malicious.exe');
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('STORAGE_ERROR');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('STORAGE_ERROR');
       expect(mockUploadService.handleStorageError).toHaveBeenCalledWith(fileTypeError);
     });
   });
@@ -291,11 +291,11 @@ describe('Error Handling Tests', () => {
       const result = await mockUploadService.createPost(testPostData);
 
       // Assert proper error handling
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error.type).toBe('DATABASE_ERROR');
-      expect(result.error.message).toBe('Unable to save data. Please try again.');
-      expect(result.error.originalError).toBe('Foreign key constraint violation');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error).toBeDefined();
+      expect((result as any).error.type).toBe('DATABASE_ERROR');
+      expect((result as any).error.message).toBe('Unable to save data. Please try again.');
+      expect((result as any).error.originalError).toBe('Foreign key constraint violation');
 
       // Assert error was properly logged
       expect(mockUploadService.logError).toHaveBeenCalledWith('Database insert failed', constraintError);
@@ -314,8 +314,8 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.createPost(testPostData);
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('DATABASE_ERROR');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('DATABASE_ERROR');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Database insert failed', connectionError);
       expect(mockConsoleError).toHaveBeenCalledWith('[ERROR] Database insert failed:', connectionError);
     });
@@ -336,8 +336,8 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.createPost(testPostData);
 
-      expect(result.success).toBe(false);
-      expect(result.error.originalError).toBe('Duplicate key value violates unique constraint');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.originalError).toBe('Duplicate key value violates unique constraint');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Database insert failed', duplicateError);
     });
 
@@ -356,8 +356,8 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.createPost(testPostData);
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('DATABASE_ERROR');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('DATABASE_ERROR');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Database insert failed', permissionError);
       expect(mockConsoleError).toHaveBeenCalledWith('[ERROR] Database insert failed:', permissionError);
     });
@@ -374,8 +374,8 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.createPost(testPostData);
 
-      expect(result.success).toBe(false);
-      expect(result.error.type).toBe('DATABASE_ERROR');
+      expect((result as any).success).toBe(false);
+      expect((result as any).error.type).toBe('DATABASE_ERROR');
       expect(mockUploadService.logError).toHaveBeenCalledWith('Database insert failed', rollbackError);
     });
   });
@@ -392,12 +392,12 @@ describe('Error Handling Tests', () => {
         'data:text/html,<script>alert("xss")</script>'
       ];
 
-      mockParseQRCode.mockImplementation(async (url: string) => {
+      (mockParseQRCode.mockImplementation as any)(async (url: any) => {
         // Simulate real parseQRCode behavior - return null for invalid URLs
         if (!url || typeof url !== 'string') return null;
         if (!url.startsWith('https://')) return null;
         if (!url.includes('/event/')) return null;
-        
+
         // If URL doesn't match expected pattern, return null
         const eventIdMatch = url.match(/\/event\/([^\/\?#]+)/);
         return eventIdMatch ? eventIdMatch[1] : null;
@@ -422,7 +422,7 @@ describe('Error Handling Tests', () => {
         'https://legitimate-site.com/../../../admin/delete-all'
       ];
 
-      mockParseQRCode.mockImplementation(async (url: string) => {
+      (mockParseQRCode.mockImplementation as any)(async (url: any) => {
         // Simulate security checks in real parseQRCode
         const allowedDomains = ['app.example.com', 'myapp.com'];
         try {
@@ -449,7 +449,7 @@ describe('Error Handling Tests', () => {
     it('should handle QR parsing errors gracefully', async () => {
       const corruptedQRData = 'data:image/png;base64,corrupted-data-that-is-not-valid';
 
-      mockParseQRCode.mockImplementation(async (qrData: string) => {
+      (mockParseQRCode.mockImplementation as any)(async (qrData: any) => {
         // Simulate QR parsing library throwing error for corrupted data
         if (qrData.includes('corrupted')) {
           throw new Error('Unable to decode QR code');
@@ -595,8 +595,8 @@ describe('Error Handling Tests', () => {
       const storageResult = await mockUploadService.uploadFile(testFile, 'uploads/test.jpg');
       const dbResult = await mockUploadService.createPost(testPostData);
       
-      expect(storageResult.success).toBe(false);
-      expect(dbResult.success).toBe(false);
+      expect((storageResult as any).success).toBe(false);
+      expect((dbResult as any).success).toBe(false);
       await expect(mockGenerateQRCode('test-event')).rejects.toThrow('QR service unavailable');
 
       // Verify all errors were logged
@@ -619,7 +619,7 @@ describe('Error Handling Tests', () => {
 
       const result = await mockUploadService.uploadFile(testFile, 'uploads/context-test.jpg');
 
-      expect(result.success).toBe(false);
+      expect((result as any).success).toBe(false);
       expect(mockUploadService.logError).toHaveBeenCalledWith('Storage operation failed', contextualError);
 
       // Verify context is preserved in error logging
@@ -679,11 +679,11 @@ describe('Error Handling Tests', () => {
 
       // First attempt - should fail
       const firstResult = await mockUploadService.uploadFile(testFile, 'uploads/retry-test.jpg');
-      expect(firstResult.success).toBe(false);
+      expect((firstResult as any).success).toBe(false);
 
       // Second attempt - should succeed
       const secondResult = await mockUploadService.uploadFile(testFile, 'uploads/retry-test.jpg');
-      expect(secondResult.success).toBe(true);
+      expect((secondResult as any).success).toBe(true);
 
       expect(mockStorageUpload).toHaveBeenCalledTimes(2);
     });

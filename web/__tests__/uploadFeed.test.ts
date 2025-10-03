@@ -51,8 +51,8 @@ const uploadPhotosToFeed = async (
       contentType: 'image/jpeg',
     });
 
-    if (storageResult.error) {
-      throw new Error(`Failed to upload photo ${i}: ${storageResult.error}`);
+    if ((storageResult as any).error) {
+      throw new Error(`Failed to upload photo ${i}: ${(storageResult as any).error}`);
     }
 
     // Create post record
@@ -66,8 +66,8 @@ const uploadPhotosToFeed = async (
 
     const dbResult = await mockDbInsert(post);
 
-    if (dbResult.error) {
-      throw new Error(`Failed to insert post ${i}: ${dbResult.error}`);
+    if ((dbResult as any).error) {
+      throw new Error(`Failed to insert post ${i}: ${(dbResult as any).error}`);
     }
 
     uploadedPosts.push(post);
@@ -93,17 +93,17 @@ describe('Upload Feed Integration Tests', () => {
     jest.clearAllMocks();
     
     // Setup mock implementations
-    mockStorageUpload.mockResolvedValue({
+    (mockStorageUpload as any).mockResolvedValue({
       data: { path: 'some/path' },
       error: null,
     });
 
-    mockDbInsert.mockResolvedValue({
+    (mockDbInsert as any).mockResolvedValue({
       data: {},
       error: null,
     });
 
-    mockDbFrom.mockImplementation((table: string) => {
+    (mockDbFrom.mockImplementation as any)((table: any) => {
       if (table === 'posts') {
         return {
           insert: mockDbInsert,
@@ -185,9 +185,9 @@ describe('Upload Feed Integration Tests', () => {
     for (let i = 0; i < 5; i++) {
       const call = mockStorageUpload.mock.calls[i];
       const filePath = call[0];
-      
-      expect(filePath).toMatch(new RegExp(`^${eventId}/photo_\\d+_${i}\\.jpg$`));
-      expect(filePath.startsWith(`${eventId}/`)).toBe(true);
+
+      expect((filePath as any)).toMatch(new RegExp(`^${eventId}/photo_\\d+_${i}\\.jpg$`));
+      expect((filePath as any).startsWith(`${eventId}/`)).toBe(true);
     }
 
     // Check all post records
@@ -243,7 +243,7 @@ describe('Upload Feed Integration Tests', () => {
     const photos = createMockPhotos(3, eventId);
 
     // Mock a failure on the second upload
-    mockStorageUpload
+    (mockStorageUpload as any)
       .mockResolvedValueOnce({ data: { path: 'path1' }, error: null })
       .mockResolvedValueOnce({ data: null, error: 'Storage error' });
 
