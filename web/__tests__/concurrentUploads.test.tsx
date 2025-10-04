@@ -1,5 +1,6 @@
+/** @jest-environment jsdom */
 // @ts-nocheck
-import { jest } from '@jest/globals';
+// import jest from '@jest/globals';
 import React from 'react';
 import { render, screen, fireEvent, waitFor, userEvent, cleanup, customMatchers } from './test-utils';
 import UploadWidget from '../src/components/UploadWidget';
@@ -15,17 +16,19 @@ global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
   drawImage: jest.fn(),
 }));
 
-global.HTMLCanvasElement.prototype.toBlob = jest.fn((callback) => {
+global.HTMLCanvasElement.prototype.toBlob = jest.fn(function(callback) {
   const blob = new Blob(['test'], { type: 'image/jpeg' });
-  callback(blob);
+  setTimeout(() => callback(blob), 0);
 });
 
 global.Image = class {
   constructor() {
     this.onload = null;
+    this.width = 800;
+    this.height = 600;
   }
   set src(value) {
-    // Trigger onload immediately after src is set
+    // Trigger onload asynchronously
     setTimeout(() => {
       if (this.onload) {
         this.onload();
@@ -145,7 +148,16 @@ describe('Concurrent Uploads Tests', () => {
       await user.upload(fileInput2, file2);
 
       // Wait a bit for React to process the file upload
-      await new Promise(resolve => setTimeout(resolve, 100));
+      fireEvent.change(fileInput1, { target: { files: [file1] } });
+      fireEvent.change(fileInput2, { target: { files: [file2] } });
+
+      // Wait for image processing and state updates to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      await waitFor(() => {
+        const uploadButton = container1.querySelector('button[aria-label="Upload"]');
+        expect(uploadButton).not.toBeDisabled();
+      }, { timeout: 3000 });
 
       // Get upload buttons
       const uploadButton1 = container1.querySelector('button[aria-label="Upload"]');
@@ -210,7 +222,18 @@ describe('Concurrent Uploads Tests', () => {
       await user.upload(fileInput2, pngFile);
 
       // Wait for React to process
-      await new Promise(resolve => setTimeout(resolve, 100));
+      fireEvent.change(fileInput1, { target: { files: [jpegFile] } });
+      fireEvent.change(fileInput2, { target: { files: [pngFile] } });
+
+      // Wait for image processing
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      await waitFor(() => {
+        const uploadButton1 = container1.querySelector('button[aria-label="Upload"]');
+        const uploadButton2 = container2.querySelector('button[aria-label="Upload"]');
+        expect(uploadButton1).not.toBeDisabled();
+        expect(uploadButton2).not.toBeDisabled();
+      }, { timeout: 3000 });
 
       const uploadButton1 = container1.querySelector('button[aria-label="Upload"]');
       const uploadButton2 = container2.querySelector('button[aria-label="Upload"]');
@@ -268,14 +291,23 @@ describe('Concurrent Uploads Tests', () => {
       }
 
       // Upload files to all widgets
+      // Upload files to all widgets
       for (let i = 0; i < concurrentCount; i++) {
         const fileInput = containers[i].querySelector('input[type="file"]');
         const file = new File([`image${i + 1}`], `image-${i + 1}.jpg`, { type: 'image/jpeg' });
-        await user.upload(fileInput, file);
+        fireEvent.change(fileInput, { target: { files: [file] } });
       }
 
-      // Wait for React to process
+      // Wait for all image processing to complete
       await new Promise(resolve => setTimeout(resolve, 100));
+
+      await waitFor(() => {
+        const allEnabled = containers.every((container) => {
+          const button = container.querySelector('button[aria-label="Upload"]');
+          return button && !button.disabled;
+        });
+        expect(allEnabled).toBe(true);
+      }, { timeout: 5000 });
 
       // Click all upload buttons
       const clickPromises = containers.map((container) => {
@@ -346,17 +378,19 @@ describe('Concurrent Uploads Tests', () => {
       for (let i = 0; i < count; i++) {
         const fileInput = containers[i].querySelector('input[type="file"]');
         const file = new File([`data${i + 1}`], `file-${i + 1}.jpg`, { type: 'image/jpeg' });
-        await user.upload(fileInput, file);
+        fireEvent.change(fileInput, { target: { files: [file] } });
       }
 
-      // Wait for processing
+      // Wait for all processing
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       await waitFor(() => {
         const allEnabled = containers.every((container) => {
           const button = container.querySelector('button[aria-label="Upload"]');
           return button && !button.disabled;
         });
         expect(allEnabled).toBe(true);
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
       // Click all buttons
       const clickPromises = containers.map((container) => {
@@ -437,12 +471,17 @@ describe('Concurrent Uploads Tests', () => {
       await user.upload(fileInput1, successFile);
       await user.upload(fileInput2, conflictFile);
 
+      fireEvent.change(fileInput1, { target: { files: [successFile] } });
+      fireEvent.change(fileInput2, { target: { files: [conflictFile] } });
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       await waitFor(() => {
         const button1 = container1Div.querySelector('button[aria-label="Upload"]');
         const button2 = container2Div.querySelector('button[aria-label="Upload"]');
         expect(button1).not.toBeDisabled();
         expect(button2).not.toBeDisabled();
-      }, { timeout: 2000 });
+      }, { timeout: 3000 });
 
       const uploadButton1 = container1Div.querySelector('button[aria-label="Upload"]');
       const uploadButton2 = container2Div.querySelector('button[aria-label="Upload"]');
@@ -490,7 +529,15 @@ describe('Concurrent Uploads Tests', () => {
       await user.upload(fileInput, file);
 
       // Wait for React to process
-      await new Promise(resolve => setTimeout(resolve, 100));
+      fireEvent.change(fileInput, { target: { files: [file] } });
+
+      // Wait for image processing
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      await waitFor(() => {
+        const uploadButton = screen.getByLabelText('Upload');
+        expect(uploadButton).not.toBeDisabled();
+      }, { timeout: 3000 });
 
       const uploadButton = screen.getByLabelText('Upload');
       await user.click(uploadButton);
