@@ -107,6 +107,18 @@ export const screen = {
   },
 
   getByLabelText: (text: string | RegExp): HTMLElement => {
+    // First check for aria-label
+    const allElements = Array.from(document.querySelectorAll('[aria-label]'));
+    const ariaElement = allElements.find(el => {
+      const ariaLabel = el.getAttribute('aria-label') || '';
+      return typeof text === 'string'
+        ? ariaLabel.toLowerCase().includes(text.toLowerCase())
+        : text.test(ariaLabel);
+    });
+
+    if (ariaElement) return ariaElement as HTMLElement;
+
+    // Then check for label elements
     const labels = Array.from(document.querySelectorAll('label'));
     const label = labels.find(l => {
       const labelText = l.textContent || '';
@@ -153,6 +165,16 @@ export const customMatchers = {
       message: () => pass
         ? `Expected element not to have attribute ${attr}`
         : `Expected element to have attribute ${attr}`
+    };
+  },
+
+  toBeDisabled(element: HTMLElement) {
+    const pass = (element as any).disabled === true || element.hasAttribute('disabled');
+    return {
+      pass,
+      message: () => pass
+        ? `Expected element not to be disabled`
+        : `Expected element to be disabled`
     };
   }
 };
@@ -236,9 +258,21 @@ export const userEvent = {
     upload: async (element: HTMLElement, file: File | File[]) => {
       if (element instanceof HTMLInputElement && element.type === 'file') {
         const files = Array.isArray(file) ? file : [file];
-        const dataTransfer = new DataTransfer();
-        files.forEach(f => dataTransfer.items.add(f));
-        element.files = dataTransfer.files;
+        // Mock DataTransfer for jsdom
+        const dataTransfer = {
+          files: files,
+          items: {
+            add: () => {}
+          },
+          types: ['Files'],
+          clearData: () => {},
+          getData: () => '',
+          setData: () => {}
+        };
+        Object.defineProperty(element, 'files', {
+          value: files,
+          writable: true
+        });
         element.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }

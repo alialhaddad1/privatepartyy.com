@@ -9,7 +9,7 @@ expect.extend(toHaveNoViolations);
 expect.extend(customMatchers);
 
 // Mock fetch for API calls
-(global as any).fetch = jest.fn();
+global.fetch = jest.fn();
 
 // Mock data for testing
 const mockPosts = [
@@ -26,7 +26,7 @@ const mockPosts = [
     isLiked: false,
     comments: 1,
     media: [{
-      type: 'image' as const,
+      type: 'image',
       url: '/images/event1.jpg'
     }]
   },
@@ -43,7 +43,7 @@ const mockPosts = [
     isLiked: false,
     comments: 0,
     media: [{
-      type: 'image' as const,
+      type: 'image',
       url: '/images/workshop.jpg'
     }]
   }
@@ -52,14 +52,14 @@ const mockPosts = [
 describe('Feed Accessibility Tests', () => {
   beforeEach(() => {
     // Mock IntersectionObserver for any lazy loading
-    (global as any).IntersectionObserver = jest.fn().mockImplementation(() => ({
+    global.IntersectionObserver = jest.fn().mockImplementation(() => ({
       observe: jest.fn(),
       unobserve: jest.fn(),
       disconnect: jest.fn(),
     }));
 
     // Mock fetch to return posts
-    ((global as any).fetch as jest.Mock).mockResolvedValue({
+    global.fetch.mockResolvedValue({
       ok: true,
       json: async () => mockPosts,
     });
@@ -102,7 +102,7 @@ describe('Feed Accessibility Tests', () => {
     // Check that interactive elements are focusable
     const buttons = screen.getAllByRole('button');
 
-    buttons.forEach((element: HTMLElement) => {
+    buttons.forEach((element) => {
       // Elements should not have negative tabindex unless programmatically focused
       const tabIndex = element.getAttribute('tabindex');
       if (tabIndex) {
@@ -121,7 +121,7 @@ describe('Feed Accessibility Tests', () => {
     expect(headings.length).toBeGreaterThan(0);
 
     // Verify heading is h2
-    const mainHeading = headings.find((h: HTMLElement) => h.textContent === 'Event Feed');
+    const mainHeading = headings.find((h) => h.textContent === 'Event Feed');
     expect(mainHeading?.tagName.toLowerCase()).toBe('h2');
   });
 
@@ -140,7 +140,7 @@ describe('Feed Accessibility Tests', () => {
 
   it('handles loading state accessibility', async () => {
     // Mock slow loading - never resolves during test
-    ((global as any).fetch as jest.Mock).mockImplementation(
+    global.fetch.mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
 
@@ -156,7 +156,7 @@ describe('Feed Accessibility Tests', () => {
 
   it('handles empty state accessibility', async () => {
     // Mock empty posts array
-    ((global as any).fetch as jest.Mock).mockResolvedValue({
+    global.fetch.mockResolvedValue({
       ok: true,
       json: async () => [],
     });
@@ -193,7 +193,7 @@ describe('Feed Accessibility Tests', () => {
     const buttons = screen.getAllByRole('button');
 
     // Each focusable element should be properly marked
-    buttons.forEach((element: HTMLElement) => {
+    buttons.forEach((element) => {
       // Should be in the document and interactive
       expect(element).toBeInTheDocument();
 
@@ -217,7 +217,7 @@ describe('Feed Accessibility Tests', () => {
 
   it('handles error state accessibility', async () => {
     // Mock fetch error
-    ((global as any).fetch as jest.Mock).mockRejectedValue(new Error('Failed to load posts'));
+    global.fetch.mockRejectedValue(new Error('Failed to load posts'));
 
     render(<Feed eventId="test-event-1" />);
 

@@ -273,8 +273,9 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({
             onClick={handleUpload}
             disabled={!resizedBlob || uploading}
             className={`upload-button ${!resizedBlob || uploading ? 'disabled' : ''}`}
+            aria-label="Upload"
           >
-            {uploading ? 'Uploading...' : 'Upload Image'}
+            {uploading ? 'Uploading...' : 'Upload'}
           </button>
 
           {(selectedFile || previewUrl) && !uploading && (

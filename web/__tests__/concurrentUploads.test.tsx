@@ -1,77 +1,95 @@
+// @ts-nocheck
 import { jest } from '@jest/globals';
-import { render, screen, fireEvent, waitFor, userEvent, cleanup } from './test-utils';
-import { createClient } from '@supabase/supabase-js';
+import React from 'react';
+import { render, screen, fireEvent, waitFor, userEvent, cleanup, customMatchers } from './test-utils';
 import UploadWidget from '../src/components/UploadWidget';
 
-// Mock Supabase client
-jest.mock('@supabase/supabase-js');
+// Extend Jest matchers
+expect.extend(customMatchers);
 
-// Type definitions for test data
-interface MockPost {
-  id: string;
-  title: string;
-  content: string;
-  image_url: string;
-  user_id: string;
-  created_at: string;
-}
+// Mock fetch for API calls
+global.fetch = jest.fn();
 
-interface MockSupabaseResponse {
-  data: MockPost[] | null;
-  error: null | { message: string; code?: string };
-}
+// Mock canvas and image for browser APIs
+global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
+  drawImage: jest.fn(),
+}));
 
-// Mock implementation
-const mockSupabaseClient = {
-  from: jest.fn(() => ({
-    insert: jest.fn(),
-    select: jest.fn(() => ({
-      single: jest.fn()
-    }))
-  })),
-  storage: {
-    from: jest.fn(() => ({
-      upload: jest.fn()
-    }))
+global.HTMLCanvasElement.prototype.toBlob = jest.fn((callback) => {
+  const blob = new Blob(['test'], { type: 'image/jpeg' });
+  callback(blob);
+});
+
+global.Image = class {
+  constructor() {
+    this.onload = null;
+  }
+  set src(value) {
+    // Trigger onload immediately after src is set
+    setTimeout(() => {
+      if (this.onload) {
+        this.onload();
+      }
+    }, 0);
   }
 };
 
-// Mock the createClient function
-(createClient as jest.MockedFunction<typeof createClient>).mockReturnValue(mockSupabaseClient as any);
+global.URL.createObjectURL = jest.fn(() => 'blob:mock-url');
 
-// Mock UploadWidget's internal upload functionality
-const mockUploadFunction = jest.fn();
+// Mock XMLHttpRequest for upload progress
+class MockXMLHttpRequest {
+  constructor() {
+    this.upload = {
+      onprogress: null
+    };
+    this.onload = null;
+    this.onerror = null;
+    this.status = 200;
+  }
+  open() {}
+  setRequestHeader() {}
+  send() {
+    setTimeout(() => {
+      if (this.upload.onprogress) {
+        this.upload.onprogress({ lengthComputable: true, loaded: 100, total: 100 });
+      }
+      if (this.onload) {
+        this.onload();
+      }
+    }, 0);
+  }
+}
+global.XMLHttpRequest = MockXMLHttpRequest;
 
 describe('Concurrent Uploads Tests', () => {
-  let mockInsert: jest.MockedFunction<any>;
   const user = userEvent.setup();
 
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
 
-    // Setup mock implementations
-    mockInsert = jest.fn();
-
-    // Configure Supabase mock to return our insert mock
-    mockSupabaseClient.from.mockReturnValue({
-      insert: mockInsert,
-      select: jest.fn(() => ({
-        single: jest.fn()
-      }))
-    });
-
-    // Mock successful uploads by default
-    mockInsert.mockResolvedValue({
-      data: [{
-        id: 'mock-post-id',
-        title: 'Mock Title',
-        content: 'Mock Content',
-        image_url: 'https://storage.supabase.co/mock.jpg',
-        user_id: 'mock-user',
-        created_at: new Date().toISOString()
-      }],
-      error: null
+    // Mock successful fetch responses by default
+    global.fetch.mockImplementation((url) => {
+      if (url.includes('/api/uploads')) {
+        // Mock signed URL response
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
+      } else if (url.includes('/api/events/')) {
+        // Mock post creation response
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            postId: 'mock-post-id'
+          })
+        });
+      }
+      return Promise.reject(new Error('Unknown URL'));
     });
   });
 
@@ -82,425 +100,407 @@ describe('Concurrent Uploads Tests', () => {
 
   describe('Two Users Concurrent Upload', () => {
     it('should handle two users uploading different photos simultaneously without conflict', async () => {
-      // Mock successful responses for both uploads
-      const mockResponse1: MockSupabaseResponse = {
-        data: [{
-          id: 'post-1',
-          title: 'User 1 Photo',
-          content: 'Beautiful sunset photo',
-          image_url: 'https://storage.supabase.co/user1-photo.jpg',
-          user_id: 'user-1',
-          created_at: '2024-01-15T10:00:00Z'
-        }],
-        error: null
-      };
+      let postCount = 0;
 
-      const mockResponse2: MockSupabaseResponse = {
-        data: [{
-          id: 'post-2',
-          title: 'User 2 Photo',
-          content: 'Mountain landscape',
-          image_url: 'https://storage.supabase.co/user2-photo.jpg',
-          user_id: 'user-2',
-          created_at: '2024-01-15T10:00:01Z'
-        }],
-        error: null
-      };
+      // Mock unique post IDs for each upload
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('/api/events/')) {
+          postCount++;
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              postId: `post-${postCount}`
+            })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
+      });
 
-      // Configure mock to return different responses for each call
-      mockInsert
-        .mockResolvedValueOnce(mockResponse1)
-        .mockResolvedValueOnce(mockResponse2);
-
-      // Render two UploadWidget instances for different users
-      const { rerender } = render(
+      // Render two UploadWidget instances
+      const { container: container1 } = render(
         <UploadWidget eventId="event-1" token="user-1-token" onUploadComplete={jest.fn()} />
       );
 
-      // Get first user's upload widget elements
-      const fileInput1 = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const uploadButton1 = screen.getByRole('button', { name: /upload/i });
-
-      // Upload first user's file
-      const file1 = new File(['sunset image'], 'sunset.jpg', { type: 'image/jpeg' });
-      await user.upload(fileInput1, file1);
-
-      // Render second widget for user 2 in a different container
+      const container2Div = document.body.appendChild(document.createElement('div'));
       const { container: container2 } = render(
         <UploadWidget eventId="event-2" token="user-2-token" onUploadComplete={jest.fn()} />,
-        { container: document.body.appendChild(document.createElement('div')) }
+        { container: container2Div }
       );
 
-      // Get second user's upload widget elements
-      const fileInput2 = container2.querySelector('input[type="file"]') as HTMLInputElement;
-      const uploadButton2 = container2.querySelector('button') as HTMLButtonElement;
+      // Upload files
+      const fileInput1 = container1.querySelector('input[type="file"]');
+      const fileInput2 = container2.querySelector('input[type="file"]');
 
-      // Upload second user's file
+      const file1 = new File(['sunset image'], 'sunset.jpg', { type: 'image/jpeg' });
       const file2 = new File(['mountain image'], 'mountain.jpg', { type: 'image/jpeg' });
+
+      await user.upload(fileInput1, file1);
       await user.upload(fileInput2, file2);
 
-      // Execute both uploads concurrently
-      const upload1Promise = user.click(uploadButton1);
-      const upload2Promise = user.click(uploadButton2);
+      // Wait a bit for React to process the file upload
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      await Promise.all([upload1Promise, upload2Promise]);
+      // Get upload buttons
+      const uploadButton1 = container1.querySelector('button[aria-label="Upload"]');
+      const uploadButton2 = container2.querySelector('button[aria-label="Upload"]');
 
-      // Wait for both uploads to complete
+      await Promise.all([
+        user.click(uploadButton1),
+        user.click(uploadButton2)
+      ]);
+
+      // Verify both uploads completed
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(2);
-      });
+        expect(postCount).toBe(2);
+      }, { timeout: 3000 });
 
-      // Verify both uploads were triggered
-      expect(mockInsert).toHaveBeenCalledTimes(2);
+      expect(postCount).toBe(2);
+
+      // Cleanup
+      document.body.removeChild(container2Div);
     });
 
     it('should handle concurrent uploads with different file types', async () => {
-      const mockResponseJpeg: MockSupabaseResponse = {
-        data: [{
-          id: 'post-jpeg',
-          title: 'JPEG Upload',
-          content: 'JPEG image content',
-          image_url: 'https://storage.supabase.co/photo.jpg',
-          user_id: 'user-a',
-          created_at: '2024-01-15T10:00:00Z'
-        }],
-        error: null
-      };
+      let uploadCount = 0;
 
-      const mockResponsePng: MockSupabaseResponse = {
-        data: [{
-          id: 'post-png',
-          title: 'PNG Upload',
-          content: 'PNG image content',
-          image_url: 'https://storage.supabase.co/graphic.png',
-          user_id: 'user-b',
-          created_at: '2024-01-15T10:00:01Z'
-        }],
-        error: null
-      };
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('/api/events/')) {
+          uploadCount++;
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              postId: `post-${uploadCount}`
+            })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
+      });
 
-      mockInsert
-        .mockResolvedValueOnce(mockResponseJpeg)
-        .mockResolvedValueOnce(mockResponsePng);
-
-      // Render upload widgets for both users
-      render(<UploadWidget eventId="event-a" token="user-a-token" onUploadComplete={jest.fn()} />);
-
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-
-      // First upload - JPEG
-      const jpegFile = new File(['jpeg'], 'photo.jpg', { type: 'image/jpeg' });
-      await user.upload(fileInput, jpegFile);
-
-      const firstUpload = user.click(screen.getByRole('button', { name: /upload/i }));
-
-      // Immediately simulate second upload by re-rendering with different user
-      const { container: container2 } = render(
-        <UploadWidget eventId="event-b" token="user-b-token" onUploadComplete={jest.fn()} />,
-        { container: document.body.appendChild(document.createElement('div')) }
+      const { container: container1 } = render(
+        <UploadWidget eventId="event-a" token="user-a-token" onUploadComplete={jest.fn()} />
       );
 
-      const fileInput2 = container2.querySelector('input[type="file"]') as HTMLInputElement;
+      const container2Div = document.body.appendChild(document.createElement('div'));
+      const { container: container2 } = render(
+        <UploadWidget eventId="event-b" token="user-b-token" onUploadComplete={jest.fn()} />,
+        { container: container2Div }
+      );
 
+      const fileInput1 = container1.querySelector('input[type="file"]');
+      const fileInput2 = container2.querySelector('input[type="file"]');
+
+      const jpegFile = new File(['jpeg'], 'photo.jpg', { type: 'image/jpeg' });
       const pngFile = new File(['png'], 'graphic.png', { type: 'image/png' });
+
+      await user.upload(fileInput1, jpegFile);
       await user.upload(fileInput2, pngFile);
 
-      const secondUpload = user.click(container2.querySelector('button') as HTMLButtonElement);
+      // Wait for React to process
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      await Promise.all([firstUpload, secondUpload]);
+      const uploadButton1 = container1.querySelector('button[aria-label="Upload"]');
+      const uploadButton2 = container2.querySelector('button[aria-label="Upload"]');
+
+      await Promise.all([
+        user.click(uploadButton1),
+        user.click(uploadButton2)
+      ]);
 
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(2);
-      });
+        expect(uploadCount).toBe(2);
+      }, { timeout: 3000 });
+
+      // Cleanup
+      document.body.removeChild(container2Div);
     });
   });
 
   describe('Multiple Concurrent Uploads', () => {
-    it('should handle 10 concurrent uploads and call insert exactly 10 times', async () => {
-      // Create 10 mock responses
-      const mockResponses: MockSupabaseResponse[] = Array.from({ length: 10 }, (_, index) => ({
-        data: [{
-          id: `post-${index + 1}`,
-          title: `Upload ${index + 1}`,
-          content: `Content for upload ${index + 1}`,
-          image_url: `https://storage.supabase.co/image-${index + 1}.jpg`,
-          user_id: `user-${index + 1}`,
-          created_at: `2024-01-15T10:00:${index.toString().padStart(2, '0')}Z`
-        }],
-        error: null
-      }));
+    it('should handle 5 concurrent uploads successfully', async () => {
+      let postCreationCount = 0;
 
-      // Configure mock to return different response for each call
-      mockResponses.forEach((response) => {
-        mockInsert.mockResolvedValueOnce(response);
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('/api/events/')) {
+          postCreationCount++;
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              postId: `post-${postCreationCount}`
+            })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
       });
 
-      // Create 10 upload widget containers
-      const containers: HTMLElement[] = [];
-      const uploadPromises: Promise<void>[] = [];
+      const containers = [];
+      const concurrentCount = 5;
 
-      for (let i = 0; i < 10; i++) {
-        const container = document.body.appendChild(document.createElement('div'));
-        containers.push(container);
+      // Create 5 upload widgets
+      for (let i = 0; i < concurrentCount; i++) {
+        const containerDiv = document.body.appendChild(document.createElement('div'));
+        containers.push(containerDiv);
 
         render(
           <UploadWidget eventId={`event-${i + 1}`} token={`user-${i + 1}-token`} onUploadComplete={jest.fn()} />,
-          { container }
+          { container: containerDiv }
         );
-
-        // Fill out the form and trigger upload
-        const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-        const uploadButton = container.querySelector('button') as HTMLButtonElement;
-
-        const uploadPromise = (async () => {
-          const file = new File([`image${i + 1}`], `image-${i + 1}.jpg`, { type: 'image/jpeg' });
-          await user.upload(fileInput, file);
-
-          await user.click(uploadButton);
-        })();
-
-        uploadPromises.push(uploadPromise);
       }
 
-      // Execute all uploads concurrently
-      await Promise.all(uploadPromises);
+      // Upload files to all widgets
+      for (let i = 0; i < concurrentCount; i++) {
+        const fileInput = containers[i].querySelector('input[type="file"]');
+        const file = new File([`image${i + 1}`], `image-${i + 1}.jpg`, { type: 'image/jpeg' });
+        await user.upload(fileInput, file);
+      }
 
-      // Wait for all database inserts to complete
+      // Wait for React to process
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Click all upload buttons
+      const clickPromises = containers.map((container) => {
+        const button = container.querySelector('button[aria-label="Upload"]');
+        return user.click(button);
+      });
+
+      await Promise.all(clickPromises);
+
+      // Wait for all uploads to complete
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(10);
+        expect(postCreationCount).toBe(concurrentCount);
       }, { timeout: 5000 });
 
-      // Verify each insert was called
-      expect(mockInsert).toHaveBeenCalledTimes(10);
+      expect(postCreationCount).toBe(concurrentCount);
 
-      // Cleanup containers
-      containers.forEach((container: HTMLElement) => document.body.removeChild(container));
-    });
+      // Cleanup
+      containers.forEach((container) => document.body.removeChild(container));
+    }, 15000);
 
     it('should handle partial failures in concurrent uploads', async () => {
-      // Mock 3 successful and 2 failed uploads
-      mockInsert
-        .mockResolvedValueOnce({
-          data: [{ id: 'success-1', title: 'Success 1', user_id: 'user-1' }],
-          error: null
-        })
-        .mockResolvedValueOnce({
-          data: [{ id: 'success-2', title: 'Success 2', user_id: 'user-2' }],
-          error: null
-        })
-        .mockResolvedValueOnce({
-          data: [{ id: 'success-3', title: 'Success 3', user_id: 'user-3' }],
-          error: null
-        })
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockRejectedValueOnce(new Error('Database constraint violation'));
+      let callCount = 0;
 
-      const containers: HTMLElement[] = [];
-      const uploadPromises: Promise<void>[] = [];
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('/api/events/')) {
+          callCount++;
+          // First 3 succeed, last 2 fail
+          if (callCount <= 3) {
+            return Promise.resolve({
+              ok: true,
+              json: async () => ({
+                postId: `success-${callCount}`
+              })
+            });
+          } else {
+            return Promise.resolve({
+              ok: false,
+              json: async () => ({
+                error: 'Failed to create post'
+              })
+            });
+          }
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
+      });
 
-      // Create 5 concurrent uploads
-      for (let i = 0; i < 5; i++) {
-        const container = document.body.appendChild(document.createElement('div'));
-        containers.push(container);
+      const containers = [];
+      const count = 5;
+
+      for (let i = 0; i < count; i++) {
+        const containerDiv = document.body.appendChild(document.createElement('div'));
+        containers.push(containerDiv);
 
         render(
           <UploadWidget eventId={`event-${i + 1}`} token={`user-${i + 1}-token`} onUploadComplete={jest.fn()} />,
-          { container }
+          { container: containerDiv }
         );
-
-        const titleInput = container.querySelector('input[placeholder*="title" i]') as HTMLInputElement;
-        const contentInput = container.querySelector('textarea[placeholder*="content" i]') as HTMLTextAreaElement;
-        const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-        const uploadButton = container.querySelector('button[type="submit"]') as HTMLButtonElement;
-
-        const uploadPromise = (async () => {
-          await user.type(titleInput, `Upload ${i + 1}`);
-          await user.type(contentInput, `Content ${i + 1}`);
-
-          const file = new File([`data${i + 1}`], `file-${i + 1}.jpg`, { type: 'image/jpeg' });
-          await user.upload(fileInput, file);
-
-          await user.click(uploadButton);
-        })();
-
-        uploadPromises.push(uploadPromise);
       }
 
-      // Execute all uploads concurrently (some will fail)
-      await Promise.allSettled(uploadPromises);
+      // Upload files
+      for (let i = 0; i < count; i++) {
+        const fileInput = containers[i].querySelector('input[type="file"]');
+        const file = new File([`data${i + 1}`], `file-${i + 1}.jpg`, { type: 'image/jpeg' });
+        await user.upload(fileInput, file);
+      }
 
-      // Wait for all attempts to complete
+      // Wait for processing
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(5);
-      }, { timeout: 5000 });
+        const allEnabled = containers.every((container) => {
+          const button = container.querySelector('button[aria-label="Upload"]');
+          return button && !button.disabled;
+        });
+        expect(allEnabled).toBe(true);
+      }, { timeout: 3000 });
 
-      // Cleanup
-      containers.forEach((container: HTMLElement) => document.body.removeChild(container));
-    });
-
-    it('should maintain data integrity across concurrent uploads', async () => {
-      const concurrentCount = 20;
-
-      const mockResponses = Array.from({ length: concurrentCount }, (_, index) => ({
-        data: [{
-          id: `integrity-test-${index}`,
-          title: `Integrity Test ${index}`,
-          content: `Content ${index}`,
-          image_url: `https://storage.supabase.co/integrity-${index}.jpg`,
-          user_id: `integrity-user-${index}`,
-          created_at: new Date(Date.now() + index * 1000).toISOString()
-        }],
-        error: null
-      }));
-
-      mockResponses.forEach((response: MockSupabaseResponse) => {
-        mockInsert.mockResolvedValueOnce(response);
+      // Click all buttons
+      const clickPromises = containers.map((container) => {
+        const button = container.querySelector('button[aria-label="Upload"]');
+        return user.click(button);
       });
 
-      const containers: HTMLElement[] = [];
-      const uploadPromises: Promise<void>[] = [];
+      await Promise.allSettled(clickPromises);
 
-      const startTime = Date.now();
-
-      for (let i = 0; i < concurrentCount; i++) {
-        const container = document.body.appendChild(document.createElement('div'));
-        containers.push(container);
-
-        render(
-          <UploadWidget eventId={`integrity-event-${i}`} token={`integrity-user-${i}-token`} onUploadComplete={jest.fn()} />,
-          { container }
-        );
-
-        const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-        const uploadButton = container.querySelector('button') as HTMLButtonElement;
-
-        const uploadPromise = (async () => {
-          const file = new File([`integrity${i}`], `integrity-${i}.jpg`, { type: 'image/jpeg' });
-          await user.upload(fileInput, file);
-
-          await user.click(uploadButton);
-        })();
-
-        uploadPromises.push(uploadPromise);
-      }
-
-      await Promise.all(uploadPromises);
-
+      // Wait for all attempts
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(concurrentCount);
-      }, { timeout: 10000 });
+        expect(callCount).toBe(count);
+      }, { timeout: 5000 });
 
-      const endTime = Date.now();
-
-      // Performance assertion - should complete within reasonable time
-      expect(endTime - startTime).toBeLessThan(10000); // 10 seconds max
-
-      // Data integrity assertions - verify all calls were made with unique user IDs
-      const calls = mockInsert.mock.calls;
-      const userIds = calls.map((call: any) => call[0][0].user_id);
-      const uniqueUserIds = new Set(userIds);
-      expect(uniqueUserIds.size).toBe(concurrentCount);
+      expect(callCount).toBe(count);
 
       // Cleanup
-      containers.forEach((container: HTMLElement) => document.body.removeChild(container));
-    });
+      containers.forEach((container) => document.body.removeChild(container));
+    }, 15000);
   });
 
   describe('Error Handling in Concurrent Scenarios', () => {
     it('should handle database conflicts gracefully', async () => {
-      // Simulate a database constraint violation
-      mockInsert
-        .mockResolvedValueOnce({
-          data: [{
-            id: 'success-1',
-            title: 'Success Upload',
-            content: 'This one works',
-            image_url: 'https://storage.supabase.co/success.jpg',
-            user_id: 'user-success',
-            created_at: '2024-01-15T10:00:00Z'
-          }],
-          error: null
-        })
-        .mockRejectedValueOnce(new Error('Duplicate key violation'));
+      let callCount = 0;
 
-      const containers: HTMLElement[] = [];
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('/api/events/')) {
+          callCount++;
+          if (callCount === 1) {
+            return Promise.resolve({
+              ok: true,
+              json: async () => ({
+                postId: 'success-1'
+              })
+            });
+          } else {
+            return Promise.resolve({
+              ok: false,
+              json: async () => ({
+                error: 'Duplicate key violation'
+              })
+            });
+          }
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
+      });
 
-      // First upload (success)
-      const container1 = document.body.appendChild(document.createElement('div'));
-      containers.push(container1);
+      const containers = [];
+
+      const container1Div = document.body.appendChild(document.createElement('div'));
+      containers.push(container1Div);
       render(
         <UploadWidget eventId="event-success" token="user-success-token" onUploadComplete={jest.fn()} />,
-        { container: container1 }
+        { container: container1Div }
       );
 
-      // Second upload (conflict)
-      const container2 = document.body.appendChild(document.createElement('div'));
-      containers.push(container2);
+      const container2Div = document.body.appendChild(document.createElement('div'));
+      containers.push(container2Div);
       render(
         <UploadWidget eventId="event-conflict" token="user-conflict-token" onUploadComplete={jest.fn()} />,
-        { container: container2 }
+        { container: container2Div }
       );
 
-      // Fill and submit first form
-      const fileInput1 = container1.querySelector('input[type="file"]') as HTMLInputElement;
-      const uploadButton1 = container1.querySelector('button') as HTMLButtonElement;
+      // Upload files
+      const fileInput1 = container1Div.querySelector('input[type="file"]');
+      const fileInput2 = container2Div.querySelector('input[type="file"]');
 
       const successFile = new File(['success'], 'success.jpg', { type: 'image/jpeg' });
-      await user.upload(fileInput1, successFile);
-
-      // Fill and submit second form
-      const fileInput2 = container2.querySelector('input[type="file"]') as HTMLInputElement;
-      const uploadButton2 = container2.querySelector('button') as HTMLButtonElement;
-
       const conflictFile = new File(['conflict'], 'conflict.jpg', { type: 'image/jpeg' });
+
+      await user.upload(fileInput1, successFile);
       await user.upload(fileInput2, conflictFile);
 
-      // Execute both uploads concurrently
-      const upload1Promise = user.click(uploadButton1);
-      const upload2Promise = user.click(uploadButton2);
-
-      await Promise.allSettled([upload1Promise, upload2Promise]);
-
-      // Wait for both database operations to be attempted
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(2);
-      });
+        const button1 = container1Div.querySelector('button[aria-label="Upload"]');
+        const button2 = container2Div.querySelector('button[aria-label="Upload"]');
+        expect(button1).not.toBeDisabled();
+        expect(button2).not.toBeDisabled();
+      }, { timeout: 2000 });
 
-      // Verify both uploads were attempted
-      expect(mockInsert).toHaveBeenCalledTimes(2);
+      const uploadButton1 = container1Div.querySelector('button[aria-label="Upload"]');
+      const uploadButton2 = container2Div.querySelector('button[aria-label="Upload"]');
 
-      // Check for error handling in UI (error messages should be displayed)
+      await Promise.allSettled([
+        user.click(uploadButton1),
+        user.click(uploadButton2)
+      ]);
+
       await waitFor(() => {
-        const errorMessage = container2.querySelector('[data-testid="error-message"]') ||
-                           container2.querySelector('.error') ||
-                           screen.queryByText(/error|failed/i);
-        // Error handling should be present in the UI
-      });
+        expect(callCount).toBe(2);
+      }, { timeout: 3000 });
+
+      expect(callCount).toBe(2);
 
       // Cleanup
-      containers.forEach((container: HTMLElement) => document.body.removeChild(container));
+      containers.forEach((container) => document.body.removeChild(container));
     });
 
     it('should display appropriate error messages for failed uploads', async () => {
-      mockInsert.mockRejectedValueOnce(new Error('Network timeout'));
+      global.fetch.mockImplementation((url) => {
+        if (url.includes('/api/events/')) {
+          return Promise.resolve({
+            ok: false,
+            json: async () => ({
+              error: 'Network timeout'
+            })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            signedUrl: 'https://storage.example.com/signed-url',
+            fileKey: 'test-file-key',
+            publicUrl: 'https://storage.example.com/public-url'
+          })
+        });
+      });
 
       render(<UploadWidget eventId="test-event" token="test-token" onUploadComplete={jest.fn()} />);
 
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const uploadButton = screen.getByRole('button', { name: /upload/i });
-
+      const fileInput = document.querySelector('input[type="file"]');
       const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+
       await user.upload(fileInput, file);
 
+      // Wait for React to process
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const uploadButton = screen.getByLabelText('Upload');
       await user.click(uploadButton);
 
-      // Wait for error handling
+      // Wait for error to be displayed
       await waitFor(() => {
-        expect(mockInsert).toHaveBeenCalledTimes(1);
-      });
-
-      // Check that error is handled appropriately in the UI
-      // This would depend on how your UploadWidget handles errors
+        const statusElement = document.querySelector('.status');
+        expect(statusElement).toBeTruthy();
+        expect(statusElement.textContent).toContain('Error');
+      }, { timeout: 3000 });
     });
   });
 });

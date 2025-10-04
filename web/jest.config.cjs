@@ -10,7 +10,17 @@ module.exports = {
         allowSyntheticDefaultImports: true,
       },
     }],
+    '^.+\\.(js|jsx)$': ['ts-jest', {
+      tsconfig: {
+        jsx: 'react',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(.*\\.mjs$))',
+  ],
   modulePathIgnorePatterns: [
     '<rootDir>/\\.vscode/',
     '<rootDir>/anaconda3/',
