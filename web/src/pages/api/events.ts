@@ -159,12 +159,26 @@ export default async function handler(
   try {
     switch (method) {
       case 'POST': {
+        console.log('📝 [Events API] POST request received');
         const eventData = req.body as CreateEventBody;
+        console.log('📝 [Events API] Request body:', JSON.stringify(eventData, null, 2));
+
+        // Check environment variables
+        if (!supabaseUrl || !supabaseServiceRoleKey) {
+          console.error('❌ [Events API] Missing Supabase credentials');
+          console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Present' : 'MISSING');
+          console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? 'Present' : 'MISSING');
+          return res.status(500).json({
+            error: 'Server configuration error',
+            details: 'Missing Supabase credentials'
+          });
+        }
 
         // Support simple event creation with just name and description
         const hasDateAndTime = Boolean(eventData.date && eventData.time);
         const validation = validateEventData(eventData, hasDateAndTime);
         if (!validation.valid) {
+          console.error('❌ [Events API] Validation failed:', validation.errors);
           return res.status(400).json({
             error: 'Validation failed',
             details: validation.errors
@@ -197,17 +211,26 @@ export default async function handler(
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        
+
+        console.log('📝 [Events API] Inserting event:', JSON.stringify(eventToInsert, null, 2));
+
         const { data, error } = await supabase
           .from('events')
           .insert([eventToInsert])
           .select()
           .single();
-        
+
         if (error) {
-          console.error('Supabase error:', error);
-          return res.status(500).json({ error: 'Failed to create event' });
+          console.error('❌ [Events API] Supabase error:', error);
+          console.error('❌ [Events API] Error details:', JSON.stringify(error, null, 2));
+          return res.status(500).json({
+            error: 'Failed to create event',
+            details: error.message,
+            code: error.code
+          });
         }
+
+        console.log('✅ [Events API] Event created successfully:', data.id);
         
         return res.status(201).json({
           eventId: data.id,

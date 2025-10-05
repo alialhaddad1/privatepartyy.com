@@ -22,18 +22,44 @@ const QRScanner: React.FC<QRScannerProps> = ({ onNavigate }) => {
   const startCamera = async () => {
     try {
       setError('');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      
+
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Camera not supported on this device');
+        return;
+      }
+
+      // Request camera permission with specific constraints for mobile devices
+      // Using 'environment' for rear camera (important for iPhones)
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // These attributes are crucial for iOS Safari
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute('webkit-playsinline', 'true');
+        await videoRef.current.play(); // Explicitly start playback
         streamRef.current = stream;
         setIsScanning(true);
         scanQRCode();
       }
-    } catch (err) {
-      setError('Camera access denied or not available');
+    } catch (err: any) {
+      console.error('Camera error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError('Camera access denied. Please allow camera access in your browser settings.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError('No camera found on this device');
+      } else {
+        setError('Camera access error. Please try again or use manual input.');
+      }
     }
   };
 
@@ -134,13 +160,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onNavigate }) => {
         {!showManualInput ? (
           <>
             <div className="camera-view">
-              <video 
+              <video
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
+                webkit-playsinline="true"
                 style={{ width: '100%', maxWidth: '400px', height: 'auto' }}
               />
-              <canvas 
+              <canvas
                 ref={canvasRef}
                 style={{ display: 'none' }}
               />
