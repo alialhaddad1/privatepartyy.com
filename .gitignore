@@ -6,4 +6,4 @@ node_modules/
 coverage/
 .env
 package-lock.json
-.env.*.local
+.env.*.localnul

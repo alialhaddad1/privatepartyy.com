@@ -53,6 +53,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false, // Better for server components
   },
+  db: {
+    schema: 'api'
+  }
 });
 
 // Export default for convenience

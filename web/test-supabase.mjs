@@ -34,6 +34,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  db: {
+    schema: 'api'
   }
 });
 
@@ -41,14 +44,25 @@ async function testConnection() {
   console.log('🔌 Testing Supabase Connection...\n');
 
   try {
+    // First, test basic connection
+    console.log('1️⃣ Testing basic Supabase connection...');
+    const { data: healthCheck, error: healthError } = await supabase
+      .from('_supabase_health')
+      .select('*')
+      .limit(1);
+
+    console.log('   Connection test result:', healthError ? 'Failed' : 'Success');
+
     // Try to query the events table
-    console.log('1️⃣ Checking if "events" table exists...');
+    console.log('\n2️⃣ Checking if "events" table exists...');
     const { data, error, count } = await supabase
       .from('events')
       .select('*', { count: 'exact', head: true });
 
     if (error) {
-      console.error('❌ Error querying events table:', error.message);
+      console.error('❌ Error querying events table:');
+      console.error('   Full error object:', JSON.stringify(error, null, 2));
+      console.error('   Error message:', error.message || error);
       console.error('   Code:', error.code);
       console.error('   Details:', error.details);
       console.error('   Hint:', error.hint);
@@ -66,7 +80,7 @@ async function testConnection() {
     }
 
     // Try to get a sample event
-    console.log('\n2️⃣ Fetching sample events...');
+    console.log('\n3️⃣ Fetching sample events...');
     const { data: events, error: fetchError } = await supabase
       .from('events')
       .select('*')
@@ -82,7 +96,7 @@ async function testConnection() {
     }
 
     // Try to insert a test event
-    console.log('\n3️⃣ Testing event creation...');
+    console.log('\n4️⃣ Testing event creation...');
     const testEvent = {
       title: 'Test Event',
       description: 'This is a test event',
@@ -113,7 +127,7 @@ async function testConnection() {
       console.log('   Event ID:', newEvent.id);
 
       // Clean up - delete the test event
-      console.log('\n4️⃣ Cleaning up test event...');
+      console.log('\n5️⃣ Cleaning up test event...');
       const { error: deleteError } = await supabase
         .from('events')
         .delete()

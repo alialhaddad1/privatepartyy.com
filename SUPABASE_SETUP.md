@@ -2,6 +2,39 @@
 
 This guide will help you set up the Supabase database for local development and testing.
 
+## Table Notes
+
+Your tables are in the api schema (not public)
+Your Supabase client needs db: { schema: 'api' } in the config
+RLS is currently OFF for easy testing
+When you're ready to enable RLS later, you'll need to create policies that allow service_role full access
+
+## Scanning QR Codes
+
+Here are your options:
+Option A: Use Your Local IP Address (Easiest)
+Find your computer's local IP:
+ipconfig
+Look for "IPv4 Address" (usually 192.168.x.x)
+Update .env.local:4:
+NEXT_PUBLIC_BASE_URL=http://192.168.x.x:3000
+Connect your phone to the same WiFi network
+Access http://192.168.x.x:3000 on your phone
+Pros: Quick and easy
+Cons: Only works on same WiFi network
+Option B: Use ngrok (Best for QR testing)
+Install ngrok: https://ngrok.com/download
+Run your dev server:
+npm run dev
+In another terminal:
+ngrok http 3000
+Copy the HTTPS URL (e.g., https://abc123.ngrok.io)
+Update .env.local:4:
+NEXT_PUBLIC_BASE_URL=https://abc123.ngrok.io
+Restart dev server - QR codes will now work on any device!
+Pros: Works anywhere, HTTPS support
+Cons: Free tier has session limits
+
 ## 🔑 Current Issue
 
 **The events table doesn't exist in your Supabase database!** This is why event creation is failing.

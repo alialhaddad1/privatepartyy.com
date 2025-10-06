@@ -9,6 +9,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  db: {
+    schema: 'api'
   }
 });
 
@@ -146,8 +149,18 @@ function isValidUrl(url: string): boolean {
   }
 }
 
-function generateEventToken(): string {
-  return randomBytes(32).toString('hex');
+function generateEventToken(eventTitle: string): string {
+  // Create a URL-friendly slug from the event title
+  const baseSlug = eventTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, '')     // Remove leading/trailing hyphens
+    .substring(0, 30);            // Limit length
+
+  // Add random suffix to ensure uniqueness (short and memorable)
+  const randomSuffix = randomBytes(2).toString('hex'); // 4 characters
+
+  return `${baseSlug}-${randomSuffix}`;
 }
 
 export default async function handler(
@@ -185,8 +198,8 @@ export default async function handler(
           });
         }
 
-        const token = generateEventToken();
         const title = (eventData.title || eventData.name || '').trim();
+        const token = generateEventToken(title);
 
         // Use current date/time + 1 hour as default if not provided
         const now = new Date();
