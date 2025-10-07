@@ -131,8 +131,32 @@ const QRScanner: React.FC<QRScannerProps> = ({ onNavigate }) => {
 
   const handleQRCodeDetected = (qrData: string) => {
     stopCamera();
-    const url = qrData.startsWith('/') ? qrData : `/${qrData}`;
-    
+
+    // Parse the QR data to extract event ID and token
+    // Expected format: "event/123?token=abc123" or "/event/123?token=abc123"
+    const cleanData = qrData.startsWith('/') ? qrData.substring(1) : qrData;
+
+    // Check if user already has a profile
+    const hasProfile = typeof window !== 'undefined' && localStorage.getItem('userProfile');
+
+    let url: string;
+    if (hasProfile) {
+      // User has a profile, go directly to event
+      url = `/${cleanData}`;
+    } else {
+      // No profile, redirect to join page
+      // Extract eventId from the URL
+      const match = cleanData.match(/event\/([^?]+)/);
+      if (match) {
+        const eventId = match[1];
+        const tokenMatch = cleanData.match(/token=([^&]+)/);
+        const token = tokenMatch ? tokenMatch[1] : '';
+        url = `/join/${eventId}${token ? `?token=${token}` : ''}`;
+      } else {
+        url = `/${cleanData}`;
+      }
+    }
+
     if (onNavigate) {
       onNavigate(url);
     } else {
@@ -144,13 +168,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ onNavigate }) => {
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (manualInput.trim()) {
-      const url = manualInput.startsWith('/') ? manualInput : `/${manualInput}`;
-      
-      if (onNavigate) {
-        onNavigate(url);
-      } else {
-        window.location.href = url;
-      }
+      // Use the same logic as QR code detection
+      handleQRCodeDetected(manualInput.trim());
     }
   };
 

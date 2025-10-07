@@ -135,6 +135,25 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({
   };
 
   const createPost = async (fileKey: string, publicUrl: string): Promise<string> => {
+    // Get user profile from localStorage
+    const userProfile = typeof window !== 'undefined'
+      ? localStorage.getItem('userProfile')
+      : null;
+
+    let authorData = {};
+    if (userProfile) {
+      try {
+        const profile = JSON.parse(userProfile);
+        authorData = {
+          authorId: profile.id,
+          authorName: profile.name,
+          authorAvatar: profile.avatar
+        };
+      } catch (err) {
+        console.error('Error parsing user profile:', err);
+      }
+    }
+
     const response = await fetch(`/api/events/${eventId}/posts`, {
       method: 'POST',
       headers: {
@@ -145,7 +164,8 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({
         type: 'image',
         imageUrl: publicUrl,
         fileKey,
-        originalFilename: selectedFile?.name
+        originalFilename: selectedFile?.name,
+        ...authorData
       })
     });
 

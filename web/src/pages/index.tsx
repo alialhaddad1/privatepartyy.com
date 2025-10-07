@@ -11,6 +11,9 @@ const LandingPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [eventName, setEventName] = useState('');
   const [eventDescription, setEventDescription] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [eventTime, setEventTime] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState('');
 
@@ -18,6 +21,11 @@ const LandingPage: React.FC = () => {
     e.preventDefault();
     if (!eventName.trim()) {
       setError('Event name is required');
+      return;
+    }
+
+    if (!eventDate || !eventTime) {
+      setError('Event date and time are required');
       return;
     }
 
@@ -33,6 +41,9 @@ const LandingPage: React.FC = () => {
         body: JSON.stringify({
           name: eventName.trim(),
           description: eventDescription.trim(),
+          location: eventLocation.trim() || undefined,
+          date: eventDate,
+          time: eventTime,
           isPublic: isPublic,
         }),
       });
@@ -182,6 +193,44 @@ const LandingPage: React.FC = () => {
               </div>
 
               <div className="form-group">
+                <label htmlFor="eventLocation">Location/Address</label>
+                <input
+                  type="text"
+                  id="eventLocation"
+                  value={eventLocation}
+                  onChange={(e) => setEventLocation(e.target.value)}
+                  placeholder="123 Main St, City, State"
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="eventDate">Date *</label>
+                  <input
+                    type="date"
+                    id="eventDate"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="eventTime">Start Time *</label>
+                  <input
+                    type="time"
+                    id="eventTime"
+                    value={eventTime}
+                    onChange={(e) => setEventTime(e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
                 <label className="privacy-label">Event Privacy</label>
                 <div className="privacy-options">
                   <button
@@ -192,7 +241,7 @@ const LandingPage: React.FC = () => {
                     <div className="privacy-icon">🌍</div>
                     <div className="privacy-text">
                       <strong>Public Event</strong>
-                      <span>Visible on Events page, accessible with QR code</span>
+                      <span>Visible on Events page for anyone to see and join with QR code</span>
                     </div>
                   </button>
 
@@ -204,7 +253,7 @@ const LandingPage: React.FC = () => {
                     <div className="privacy-icon">🔒</div>
                     <div className="privacy-text">
                       <strong>Private Event</strong>
-                      <span>Only accessible via QR code, not listed publicly</span>
+                      <span>Hidden from Events page, only accessible with QR code</span>
                     </div>
                   </button>
                 </div>
@@ -226,7 +275,7 @@ const LandingPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreating || !eventName.trim()}
+                  disabled={isCreating || !eventName.trim() || !eventDate || !eventTime}
                   className="btn btn-submit"
                 >
                   {isCreating ? 'Creating...' : 'Create Event'}
@@ -469,6 +518,17 @@ const LandingPage: React.FC = () => {
           margin-bottom: 24px;
         }
 
+        .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        .form-row .form-group {
+          margin-bottom: 0;
+        }
+
         .form-group label {
           display: block;
           font-size: 14px;
@@ -676,6 +736,15 @@ const LandingPage: React.FC = () => {
 
           .form-actions {
             flex-direction: column;
+          }
+
+          .form-row {
+            grid-template-columns: 1fr;
+            gap: 0;
+          }
+
+          .form-row .form-group {
+            margin-bottom: 24px;
           }
         }
       `}</style>

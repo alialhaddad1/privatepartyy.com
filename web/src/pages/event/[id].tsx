@@ -49,7 +49,7 @@ interface EventFeedPageProps {
 const EventFeedPage: React.FC<EventFeedPageProps> = ({
   initialPosts,
   event,
-  user,
+  user: serverUser,
   token,
   isHost
 }) => {
@@ -61,6 +61,33 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   const [showUpload, setShowUpload] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [localUser, setLocalUser] = useState<User | null>(null);
+
+  // Load user profile from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedProfile = localStorage.getItem('userProfile');
+      if (storedProfile) {
+        try {
+          const profile = JSON.parse(storedProfile);
+          setLocalUser({
+            id: profile.id,
+            name: profile.name,
+            avatar: profile.avatar,
+            isSubscribed: false, // Local users are not subscribed by default
+          });
+        } catch (err) {
+          console.error('Error parsing user profile:', err);
+        }
+      } else if (!serverUser) {
+        // No profile found, redirect to join page
+        router.push(`/join/${id}?token=${token}`);
+      }
+    }
+  }, [serverUser, id, token, router]);
+
+  // Use server user if available, otherwise use local user
+  const user = serverUser || localUser;
 
   const fetchPosts = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
@@ -346,13 +373,9 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                 <div className="post-card">
                   <div className="post-header">
                     <div className="author-info">
-                      {post.authorAvatar && (
-                        <img 
-                          src={post.authorAvatar} 
-                          alt={post.authorName}
-                          className="author-avatar"
-                        />
-                      )}
+                      <div className="author-avatar">
+                        {post.authorAvatar}
+                      </div>
                       <div className="author-details">
                         <span className="author-name">{post.authorName}</span>
                         <span className="post-time">
@@ -648,6 +671,153 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
           background-color: #1991db;
         }
 
+        .posts-list {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .post-wrapper {
+          width: 100%;
+        }
+
+        .post-card {
+          background: white;
+          border-radius: 12px;
+          padding: 20px;
+          border: 1px solid #e1e8ed;
+          transition: box-shadow 0.2s;
+        }
+
+        .post-card:hover {
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .post-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 15px;
+        }
+
+        .author-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .author-avatar {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          flex-shrink: 0;
+        }
+
+        .author-details {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .author-name {
+          font-weight: 600;
+          color: #1a1a1a;
+          font-size: 15px;
+        }
+
+        .post-time {
+          font-size: 13px;
+          color: #657786;
+        }
+
+        .dm-button {
+          padding: 6px 12px;
+          background: #1da1f2;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .dm-button:hover:not(:disabled) {
+          background: #1991db;
+        }
+
+        .dm-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .post-content {
+          margin-bottom: 15px;
+        }
+
+        .post-text {
+          font-size: 15px;
+          color: #1a1a1a;
+          line-height: 1.5;
+          margin: 0 0 12px 0;
+        }
+
+        .post-image {
+          width: 100%;
+          border-radius: 12px;
+          max-height: 500px;
+          object-fit: cover;
+        }
+
+        .post-actions {
+          display: flex;
+          gap: 16px;
+          padding-top: 12px;
+          border-top: 1px solid #e1e8ed;
+        }
+
+        .action-button {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          background: none;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          color: #657786;
+          transition: background 0.2s;
+        }
+
+        .action-button:hover:not(:disabled) {
+          background: #f0f2f5;
+        }
+
+        .action-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .like-button.liked {
+          color: #e0245e;
+        }
+
+        .subscription-overlay {
+          margin-top: 12px;
+          padding: 12px;
+          background: #fff3cd;
+          border: 1px solid #ffc107;
+          border-radius: 6px;
+          text-align: center;
+          font-size: 13px;
+          color: #856404;
+        }
+
         @media (max-width: 768px) {
           .event-header {
             flex-direction: column;
@@ -683,72 +853,35 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const { id, token } = context.query;
 
   if (!token) {
+    // No token provided, redirect to join page
     return {
       redirect: {
-        destination: '/login',
+        destination: `/join/${id}`,
         permanent: false,
       },
     };
   }
 
-  try {
-    // Fetch event data and posts
-    const [eventResponse, postsResponse, userResponse] = await Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/${id}?token=${token}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/${id}/posts?token=${token}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }).catch(() => null), // User might not be logged in
-    ]);
-
-    if (!eventResponse.ok || !postsResponse.ok) {
-      if (eventResponse.status === 401 || postsResponse.status === 401) {
-        return {
-          redirect: {
-            destination: '/login',
-            permanent: false,
-          },
-        };
-      }
-      
-      throw new Error('Failed to fetch event data');
-    }
-
-    const [eventData, postsData, userData] = await Promise.all([
-      eventResponse.json(),
-      postsResponse.json(),
-      userResponse?.ok ? userResponse.json() : null,
-    ]);
-
-    // Check if user is the host
-    const isHost = userData?.user?.id === eventData.event.hostId;
-
-    return {
-      props: {
-        initialPosts: postsData.posts || [],
-        event: eventData.event,
-        user: userData?.user || null,
-        token: token as string,
-        isHost,
+  // For now, return minimal props and let client-side handle data fetching
+  // This is because the API endpoints for individual events don't exist yet
+  return {
+    props: {
+      initialPosts: [],
+      event: {
+        id: id as string,
+        name: 'Loading...',
+        description: '',
+        hostId: '',
+        hostName: '',
+        location: '',
+        date: '',
+        isActive: true,
       },
-    };
-  } catch (error) {
-    console.error('Error in getServerSideProps:', error);
-    
-    return {
-      notFound: true,
-    };
-  }
+      user: null,
+      token: token as string,
+      isHost: false,
+    },
+  };
 };
 
 export default EventFeedPage;

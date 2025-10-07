@@ -187,9 +187,8 @@ export default async function handler(
           });
         }
 
-        // Support simple event creation with just name and description
-        const hasDateAndTime = Boolean(eventData.date && eventData.time);
-        const validation = validateEventData(eventData, hasDateAndTime);
+        // Validate event data - date and time are now required
+        const validation = validateEventData(eventData, true);
         if (!validation.valid) {
           console.error('❌ [Events API] Validation failed:', validation.errors);
           return res.status(400).json({
@@ -201,16 +200,11 @@ export default async function handler(
         const title = (eventData.title || eventData.name || '').trim();
         const token = generateEventToken(title);
 
-        // Use current date/time + 1 hour as default if not provided
-        const now = new Date();
-        const defaultDate = now.toISOString().split('T')[0];
-        const defaultTime = `${String(now.getHours() + 1).padStart(2, '0')}:00`;
-
         const eventToInsert = {
           title: title,
           description: eventData.description?.trim() || '',
-          date: eventData.date || defaultDate,
-          time: eventData.time || defaultTime,
+          date: eventData.date,
+          time: eventData.time,
           location: eventData.location?.trim(),
           max_attendees: eventData.maxAttendees,
           current_attendees: 0,
