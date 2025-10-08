@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Header from '../components/Header';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Event {
   id: string;
@@ -22,16 +23,33 @@ interface Event {
 
 const EventsPage: React.FC = () => {
   const router = useRouter();
-  const [events, setEvents] = useState<Event[]>([]);
+  const { user } = useAuth();
+  const [myEvents, setMyEvents] = useState<Event[]>([]);
+  const [publicEvents, setPublicEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    if (user) {
+      fetchMyEvents();
+    }
+    fetchPublicEvents();
+  }, [user]);
 
-  const fetchEvents = async () => {
+  const fetchMyEvents = async () => {
+    try {
+      const response = await fetch(`/api/events?hostId=${user?.id}&limit=50&orderBy=date&order=asc`);
+      if (response.ok) {
+        const data = await response.json();
+        setMyEvents(data.events || []);
+      }
+    } catch (err) {
+      console.error('Error fetching my events:', err);
+    }
+  };
+
+  const fetchPublicEvents = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/events?isPublic=true&limit=50&orderBy=date&order=asc');
@@ -41,7 +59,7 @@ const EventsPage: React.FC = () => {
       }
 
       const data = await response.json();
-      setEvents(data.events || []);
+      setPublicEvents(data.events || []);
       setError('');
     } catch (err) {
       console.error('Error fetching events:', err);
@@ -51,7 +69,18 @@ const EventsPage: React.FC = () => {
     }
   };
 
-  const filteredEvents = events.filter(event => {
+  const filteredMyEvents = myEvents.filter(event => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      event.title.toLowerCase().includes(search) ||
+      event.description?.toLowerCase().includes(search) ||
+      event.location?.toLowerCase().includes(search) ||
+      event.tags?.some(tag => tag.toLowerCase().includes(search))
+    );
+  });
+
+  const filteredPublicEvents = publicEvents.filter(event => {
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
@@ -93,57 +122,135 @@ const EventsPage: React.FC = () => {
       <Header activePage="events" />
 
       <div className="container">
-        <div className="page-header">
-          <h1>Public Events</h1>
-          <p className="subtitle">Discover and join exciting events happening around you</p>
-        </div>
-
-        <div className="search-section">
-          <input
-            type="text"
-            placeholder="Search events by name, location, or tags..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
-
-        {error && (
-          <div className="error-message">
-            {error}
-            <button onClick={fetchEvents} className="retry-button">
-              Retry
+        {/* Public Events Section - Always shown first */}
+        <div className="section">
+          <div className="section-header">
+            <div className="header-content">
+              <h1 className="section-title-large">Public Events</h1>
+              <p className="subtitle">Discover and join exciting events happening around you</p>
+            </div>
+            <button
+              onClick={() => router.push('/')}
+              className="create-event-btn"
+            >
+              <span className="btn-icon">🎉</span>
+              Create Event
             </button>
           </div>
-        )}
 
-        {loading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading events...</p>
+          <div className="search-section">
+            <input
+              type="text"
+              placeholder="Search events by name, location, or tags..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
           </div>
-        ) : (
-          <div className="events-grid">
-            {filteredEvents.length === 0 ? (
-              <div className="empty-state">
-                <h3>{searchTerm ? 'No events match your search' : 'No public events available'}</h3>
-                <p>
-                  {searchTerm
-                    ? 'Try a different search term'
-                    : 'Be the first to create a public event!'}
-                </p>
-                <button
-                  onClick={() => router.push('/')}
-                  className="create-event-button"
-                >
-                  Create Event
-                </button>
-              </div>
-            ) : (
-              filteredEvents.map((event) => (
+
+          {error && (
+            <div className="error-message">
+              {error}
+              <button onClick={fetchPublicEvents} className="retry-button">
+                Retry
+              </button>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Loading events...</p>
+            </div>
+          ) : (
+            <div className="events-grid">
+              {filteredPublicEvents.length === 0 ? (
+                <div className="empty-state">
+                  <h3>{searchTerm ? 'No events match your search' : 'No public events available'}</h3>
+                  <p>
+                    {searchTerm
+                      ? 'Try a different search term'
+                      : 'Be the first to create a public event!'}
+                  </p>
+                  <button
+                    onClick={() => router.push('/')}
+                    className="create-event-button"
+                  >
+                    Create Event
+                  </button>
+                </div>
+              ) : (
+                filteredPublicEvents.map((event: Event) => (
+                  <div
+                    key={event.id}
+                    className="event-card"
+                    onClick={() => handleEventClick(event.id)}
+                  >
+                    {event.imageUrl && (
+                      <div className="event-image">
+                        <img src={event.imageUrl} alt={event.title} />
+                      </div>
+                    )}
+                    <div className="event-content">
+                      <h3 className="event-title">{event.title}</h3>
+
+                      <div className="event-meta">
+                        <div className="meta-item">
+                          📅 {formatDate(event.date, event.time)}
+                        </div>
+                        {event.location && (
+                          <div className="meta-item">
+                            📍 {event.location}
+                          </div>
+                        )}
+                        {event.hostName && (
+                          <div className="meta-item">
+                            👤 Hosted by {event.hostName}
+                          </div>
+                        )}
+                        {event.maxAttendees && (
+                          <div className="meta-item">
+                            👥 {event.currentAttendees || 0} / {event.maxAttendees} attending
+                          </div>
+                        )}
+                      </div>
+
+                      {event.description && (
+                        <p className="event-description">
+                          {event.description.length > 150
+                            ? `${event.description.substring(0, 150)}...`
+                            : event.description}
+                        </p>
+                      )}
+
+                      {event.tags && event.tags.length > 0 && (
+                        <div className="event-tags">
+                          {event.tags.map((tag: string, index: number) => (
+                            <span key={index} className="tag">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* My Events Section - Only show if user is logged in and has events */}
+        {user && filteredMyEvents.length > 0 && (
+          <div className="section my-events-section">
+            <div className="section-header">
+              <h2 className="section-title-large">My Events</h2>
+            </div>
+            <div className="events-grid">
+              {filteredMyEvents.map((event: Event) => (
                 <div
                   key={event.id}
-                  className="event-card"
+                  className="event-card my-event"
                   onClick={() => handleEventClick(event.id)}
                 >
                   {event.imageUrl && (
@@ -152,6 +259,7 @@ const EventsPage: React.FC = () => {
                     </div>
                   )}
                   <div className="event-content">
+                    <div className="host-badge">Your Event</div>
                     <h3 className="event-title">{event.title}</h3>
 
                     <div className="event-meta">
@@ -161,11 +269,6 @@ const EventsPage: React.FC = () => {
                       {event.location && (
                         <div className="meta-item">
                           📍 {event.location}
-                        </div>
-                      )}
-                      {event.hostName && (
-                        <div className="meta-item">
-                          👤 Hosted by {event.hostName}
                         </div>
                       )}
                       {event.maxAttendees && (
@@ -185,7 +288,7 @@ const EventsPage: React.FC = () => {
 
                     {event.tags && event.tags.length > 0 && (
                       <div className="event-tags">
-                        {event.tags.map((tag, index) => (
+                        {event.tags.map((tag: string, index: number) => (
                           <span key={index} className="tag">
                             {tag}
                           </span>
@@ -194,8 +297,8 @@ const EventsPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))
-            )}
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -295,11 +398,76 @@ const EventsPage: React.FC = () => {
           100% { transform: rotate(360deg); }
         }
 
+        .section {
+          margin-bottom: 60px;
+        }
+
+        .my-events-section {
+          padding-top: 60px;
+          border-top: 2px solid #e1e8ed;
+        }
+
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 30px;
+          gap: 20px;
+        }
+
+        .header-content {
+          flex: 1;
+        }
+
+        .section-title-large {
+          font-size: 36px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 8px 0;
+        }
+
+        .section-title {
+          font-size: 28px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 24px 0;
+        }
+
+        .subtitle {
+          font-size: 16px;
+          color: #657786;
+          margin: 0;
+        }
+
+        .create-event-btn {
+          padding: 12px 28px;
+          font-size: 16px;
+          font-weight: 600;
+          color: white;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          transition: all 0.3s;
+          white-space: nowrap;
+        }
+
+        .create-event-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-icon {
+          font-size: 20px;
+        }
+
         .events-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 24px;
-          margin-top: 30px;
         }
 
         .event-card {
@@ -309,11 +477,27 @@ const EventsPage: React.FC = () => {
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
           cursor: pointer;
           transition: transform 0.2s, box-shadow 0.2s;
+          position: relative;
         }
 
         .event-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .event-card.my-event {
+          border: 2px solid #667eea;
+        }
+
+        .host-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 12px;
         }
 
         .event-image {
@@ -416,17 +600,31 @@ const EventsPage: React.FC = () => {
             padding: 20px 15px;
           }
 
-          .page-header h1 {
+          .section-header {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .section-title-large {
             font-size: 28px;
           }
 
           .subtitle {
-            font-size: 16px;
+            font-size: 14px;
+          }
+
+          .create-event-btn {
+            width: 100%;
+            justify-content: center;
           }
 
           .events-grid {
             grid-template-columns: 1fr;
             gap: 16px;
+          }
+
+          .my-events-section {
+            padding-top: 40px;
           }
         }
       `}</style>

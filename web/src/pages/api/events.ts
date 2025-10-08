@@ -200,7 +200,7 @@ export default async function handler(
         const title = (eventData.title || eventData.name || '').trim();
         const token = generateEventToken(title);
 
-        const eventToInsert = {
+        const eventToInsert: any = {
           title: title,
           description: eventData.description?.trim() || '',
           date: eventData.date,
@@ -218,6 +218,48 @@ export default async function handler(
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
+
+        // Try to get the authenticated user and link the event to them
+        const authHeader = req.headers.authorization;
+        if (authHeader) {
+          try {
+            const authToken = authHeader.replace('Bearer ', '');
+            // Create a separate client for auth verification
+            const authSupabase = createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              process.env.SUPABASE_SERVICE_ROLE_KEY!,
+              {
+                db: { schema: 'public' },
+                auth: { autoRefreshToken: false, persistSession: false }
+              }
+            );
+            const { data: { user }, error: authError } = await authSupabase.auth.getUser(authToken);
+            if (user && !authError) {
+              console.log('📝 [Events API] Authenticated user found:', user.id);
+              eventToInsert.host_user_id = user.id;
+              // Update host_id and host_name from user profile if not provided
+              if (!eventData.hostId || eventData.hostId === 'anonymous') {
+                eventToInsert.host_id = user.id;
+              }
+              if (!eventData.hostName || eventData.hostName === 'Anonymous Host') {
+                // Try to get display name from user_profiles
+                const { data: profile } = await authSupabase
+                  .from('user_profiles')
+                  .select('display_name, email')
+                  .eq('id', user.id)
+                  .single();
+                if (profile) {
+                  eventToInsert.host_name = profile.display_name || profile.email?.split('@')[0] || 'Event Host';
+                }
+              }
+            } else {
+              console.log('📝 [Events API] No authenticated user or auth error:', authError);
+            }
+          } catch (error) {
+            console.error('📝 [Events API] Error getting user from token:', error);
+            // Continue without auth - event will be created without host_user_id
+          }
+        }
 
         console.log('📝 [Events API] Inserting event:', JSON.stringify(eventToInsert, null, 2));
 

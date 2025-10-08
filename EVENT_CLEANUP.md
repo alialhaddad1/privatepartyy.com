@@ -182,9 +182,15 @@ await supabase
 2. Check API endpoint logs
 3. Manually run: `SELECT * FROM cleanup_expired_events();`
 4. Ensure events have valid `date` fields
+5. **IMPORTANT**: Verify the Supabase schema is set to `'api'` in the cleanup-events.ts file (not `'public'`)
 
 ### Authentication errors
 
 1. Set `CLEANUP_CRON_SECRET` in environment variables
 2. Include the header: `Authorization: Bearer YOUR_SECRET`
 3. Or remove auth check for public cron access
+
+### Schema errors ("The schema must be one of the following: api")
+
+1. Ensure the Supabase client in `cleanup-events.ts` uses `db: { schema: 'api' }`
+2. This should match the schema used in the main events API

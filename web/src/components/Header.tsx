@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
+import { useRouter } from 'next/router';
 
 interface HeaderProps {
   activePage?: string;
@@ -6,6 +9,10 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ activePage }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const { user, profile, signOut } = useAuth();
+  const router = useRouter();
 
   const navItems = [
     { name: 'Home', href: '/' },
@@ -16,6 +23,20 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleAccountClick = () => {
+    if (user) {
+      setShowAccountMenu(!showAccountMenu);
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setShowAccountMenu(false);
+    router.push('/');
   };
 
   return (
@@ -45,6 +66,26 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
                     {item.name}
                   </a>
                 ))}
+                <button
+                  onClick={handleAccountClick}
+                  className="account-button"
+                >
+                  {user ? (
+                    <span className="account-text">{profile?.display_name || 'Account'}</span>
+                  ) : (
+                    'Log In'
+                  )}
+                </button>
+                {showAccountMenu && user && (
+                  <div className="account-menu">
+                    <a href="/account" className="account-menu-item">
+                      My Account
+                    </a>
+                    <button onClick={handleSignOut} className="account-menu-item sign-out">
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             </nav>
 
@@ -83,10 +124,42 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
                   {item.name}
                 </a>
               ))}
+              {user ? (
+                <>
+                  <a
+                    href="/account"
+                    className="mobile-nav-link"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    My Account
+                  </a>
+                  <button
+                    onClick={() => {
+                      handleSignOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="mobile-nav-link sign-out"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsAuthModalOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="mobile-nav-link login-btn"
+                >
+                  Log In
+                </button>
+              )}
             </div>
           </div>
         )}
       </header>
+
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
       <style jsx>{`
         .header {
@@ -197,6 +270,60 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
           border-radius: 2px;
         }
 
+        .account-button {
+          padding: 10px 24px;
+          font-size: 15px;
+          font-weight: 600;
+          color: white;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s;
+          position: relative;
+        }
+
+        .account-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .account-menu {
+          position: absolute;
+          top: 60px;
+          right: 20px;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          min-width: 180px;
+          overflow: hidden;
+          z-index: 200;
+        }
+
+        .account-menu-item {
+          display: block;
+          width: 100%;
+          padding: 12px 20px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #4a4a4a;
+          text-decoration: none;
+          border: none;
+          background: none;
+          text-align: left;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .account-menu-item:hover {
+          background-color: #f5f5f5;
+        }
+
+        .account-menu-item.sign-out {
+          color: #c33;
+          border-top: 1px solid #e1e8ed;
+        }
+
         .mobile-menu-btn {
           display: block;
         }
@@ -253,6 +380,11 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
           text-decoration: none;
           border-radius: 8px;
           transition: all 0.2s;
+          border: none;
+          background: none;
+          width: 100%;
+          text-align: left;
+          cursor: pointer;
         }
 
         .mobile-nav-link:hover {
@@ -264,6 +396,18 @@ const Header: React.FC<HeaderProps> = ({ activePage }) => {
           background: rgba(102, 126, 234, 0.15);
           color: #667eea;
           border-left: 3px solid #667eea;
+        }
+
+        .mobile-nav-link.login-btn {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          margin-top: 8px;
+        }
+
+        .mobile-nav-link.sign-out {
+          color: #c33;
+          border-top: 1px solid #e1e8ed;
+          margin-top: 8px;
         }
       `}</style>
     </>

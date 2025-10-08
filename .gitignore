@@ -7,3 +7,6 @@ coverage/
 .env
 package-lock.json
 .env.*.localnul
+.claude
+supabase_docs/
+*.md

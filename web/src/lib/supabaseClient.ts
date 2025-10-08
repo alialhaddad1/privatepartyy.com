@@ -51,7 +51,9 @@ export interface Database {
 // Create and export singleton Supabase client
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false, // Better for server components
+    persistSession: true, // Enable session persistence for authentication
+    autoRefreshToken: true,
+    detectSessionInUrl: true
   },
   db: {
     schema: 'api'
