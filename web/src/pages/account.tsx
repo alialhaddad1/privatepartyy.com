@@ -13,16 +13,35 @@ interface Event {
   isPublic: boolean;
 }
 
+const AVATAR_OPTIONS = [
+  '😊', '😎', '🎉', '🎨', '🎵', '⚡', '🌟', '🔥',
+  '💜', '💙', '💚', '🧡', '🎭', '🎪', '🎯', '✨'
+];
+
+const GENERATIONS = [
+  { value: '', label: 'Prefer not to say' },
+  { value: 'gen-alpha', label: 'Gen Alpha (2013-present)' },
+  { value: 'gen-z', label: 'Gen Z (1997-2012)' },
+  { value: 'millennial', label: 'Millennial (1981-1996)' },
+  { value: 'gen-x', label: 'Gen X (1965-1980)' },
+  { value: 'boomer', label: 'Boomer (1946-1964)' },
+  { value: 'silent', label: 'Silent Gen (1928-1945)' },
+];
+
 const AccountPage: React.FC = () => {
   const router = useRouter();
   const { user, profile, updateProfile, loading: authLoading } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [generation, setGeneration] = useState('');
   const [saving, setSaving] = useState(false);
   const [myEvents, setMyEvents] = useState<Event[]>([]);
   const [attendingEvents, setAttendingEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [showFullAppModal, setShowFullAppModal] = useState(false);
+  const [attemptedAdvancedEdit, setAttemptedAdvancedEdit] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -30,6 +49,8 @@ const AccountPage: React.FC = () => {
     } else if (profile) {
       setDisplayName(profile.display_name || '');
       setBio(profile.bio || '');
+      setAvatarUrl(profile.avatar_url || '');
+      setGeneration(profile.generation || '');
     }
   }, [user, profile, authLoading, router]);
 
@@ -72,7 +93,9 @@ const AccountPage: React.FC = () => {
     try {
       const { error } = await updateProfile({
         display_name: displayName,
-        bio: bio
+        bio: bio,
+        avatar_url: avatarUrl,
+        generation: generation
       });
 
       if (error) {
@@ -90,7 +113,14 @@ const AccountPage: React.FC = () => {
   const handleCancel = () => {
     setDisplayName(profile?.display_name || '');
     setBio(profile?.bio || '');
+    setAvatarUrl(profile?.avatar_url || '');
+    setGeneration(profile?.generation || '');
     setIsEditing(false);
+  };
+
+  const handleAdvancedFieldClick = () => {
+    setAttemptedAdvancedEdit(true);
+    setShowFullAppModal(true);
   };
 
   if (authLoading) {
@@ -148,6 +178,36 @@ const AccountPage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
+                  <label>Avatar</label>
+                  <div className="avatar-grid">
+                    {AVATAR_OPTIONS.map((avatar) => (
+                      <button
+                        key={avatar}
+                        type="button"
+                        onClick={() => setAvatarUrl(avatar)}
+                        className={`avatar-option ${avatarUrl === avatar ? 'selected' : ''}`}
+                      >
+                        {avatar}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Generation</label>
+                  <select
+                    value={generation}
+                    onChange={(e) => setGeneration(e.target.value)}
+                  >
+                    {GENERATIONS.map((gen) => (
+                      <option key={gen.value} value={gen.value}>
+                        {gen.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label>Bio</label>
                   <textarea
                     value={bio}
@@ -155,6 +215,18 @@ const AccountPage: React.FC = () => {
                     placeholder="Tell us about yourself"
                     rows={4}
                   />
+                </div>
+
+                <div className="advanced-section">
+                  <h3>Additional Details</h3>
+                  <p className="hint-text">Want to add more personal details like interests, website, or social links?</p>
+                  <button
+                    type="button"
+                    onClick={handleAdvancedFieldClick}
+                    className="access-app-btn"
+                  >
+                    Access Full App Features
+                  </button>
                 </div>
 
                 <div className="form-actions">
@@ -171,6 +243,11 @@ const AccountPage: React.FC = () => {
                 <div className="field">
                   <label>Display Name</label>
                   <p>{profile.display_name || 'Not set'}</p>
+                </div>
+
+                <div className="field">
+                  <label>Generation</label>
+                  <p>{GENERATIONS.find(g => g.value === profile.generation)?.label || 'Not set'}</p>
                 </div>
 
                 <div className="field">
@@ -247,6 +324,26 @@ const AccountPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Access Full App Modal */}
+      {showFullAppModal && (
+        <div className="modal-overlay" onClick={() => setShowFullAppModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowFullAppModal(false)}>
+              ×
+            </button>
+            <div className="modal-icon">🎉</div>
+            <h2>Access Full App</h2>
+            <p className="modal-text">
+              Additional profile features are part of our premium experience.
+              This feature will be available soon as we continue to build out PrivatePartyy!
+            </p>
+            <button onClick={() => setShowFullAppModal(false)} className="modal-btn">
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .account-page {
@@ -339,7 +436,8 @@ const AccountPage: React.FC = () => {
         }
 
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
           width: 100%;
           padding: 12px 16px;
           font-size: 16px;
@@ -350,8 +448,79 @@ const AccountPage: React.FC = () => {
         }
 
         .form-group input:focus,
-        .form-group textarea:focus {
+        .form-group textarea:focus,
+        .form-group select:focus {
           border-color: #667eea;
+        }
+
+        .avatar-grid {
+          display: grid;
+          grid-template-columns: repeat(8, 1fr);
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .avatar-option {
+          width: 100%;
+          aspect-ratio: 1;
+          font-size: 24px;
+          border: 2px solid #e1e8ed;
+          border-radius: 8px;
+          background: white;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .avatar-option:hover {
+          border-color: #667eea;
+          transform: scale(1.1);
+        }
+
+        .avatar-option.selected {
+          border-color: #667eea;
+          background: #e8ecff;
+          transform: scale(1.1);
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .advanced-section {
+          margin-top: 30px;
+          padding: 20px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border: 2px dashed #e1e8ed;
+        }
+
+        .advanced-section h3 {
+          margin: 0 0 10px 0;
+          font-size: 18px;
+          color: #1a1a1a;
+        }
+
+        .hint-text {
+          margin: 0 0 15px 0;
+          font-size: 14px;
+          color: #657786;
+        }
+
+        .access-app-btn {
+          padding: 10px 20px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #667eea;
+          background: white;
+          border: 2px solid #667eea;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .access-app-btn:hover {
+          background: #667eea;
+          color: white;
         }
 
         .form-actions {
@@ -533,6 +702,85 @@ const AccountPage: React.FC = () => {
           100% { transform: rotate(360deg); }
         }
 
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 20px;
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 16px;
+          padding: 40px;
+          max-width: 450px;
+          width: 100%;
+          position: relative;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+          text-align: center;
+        }
+
+        .modal-close {
+          position: absolute;
+          top: 15px;
+          right: 15px;
+          background: none;
+          border: none;
+          font-size: 32px;
+          cursor: pointer;
+          color: #657786;
+          line-height: 1;
+          padding: 5px;
+          transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+          color: #1a1a1a;
+        }
+
+        .modal-icon {
+          font-size: 64px;
+          margin-bottom: 20px;
+        }
+
+        .modal-content h2 {
+          font-size: 28px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 15px 0;
+        }
+
+        .modal-text {
+          font-size: 16px;
+          color: #657786;
+          line-height: 1.6;
+          margin: 0 0 30px 0;
+        }
+
+        .modal-btn {
+          padding: 14px 32px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .modal-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
         @media (max-width: 768px) {
           .container {
             padding: 20px 15px;
@@ -549,6 +797,24 @@ const AccountPage: React.FC = () => {
 
           .form-actions {
             flex-direction: column;
+          }
+
+          .avatar-grid {
+            grid-template-columns: repeat(6, 1fr);
+          }
+
+          .modal-content {
+            padding: 30px 20px;
+          }
+
+          .modal-icon {
+            font-size: 48px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .avatar-grid {
+            grid-template-columns: repeat(4, 1fr);
           }
         }
       `}</style>

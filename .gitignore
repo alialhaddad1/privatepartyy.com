@@ -10,3 +10,5 @@ package-lock.json
 .claude
 supabase_docs/
 *.md
+*.tsbuildinfo
+docs/

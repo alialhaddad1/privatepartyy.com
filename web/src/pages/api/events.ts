@@ -9,9 +9,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
-  },
-  db: {
-    schema: 'api'
   }
 });
 
@@ -229,7 +226,6 @@ export default async function handler(
               process.env.NEXT_PUBLIC_SUPABASE_URL!,
               process.env.SUPABASE_SERVICE_ROLE_KEY!,
               {
-                db: { schema: 'public' },
                 auth: { autoRefreshToken: false, persistSession: false }
               }
             );
@@ -381,6 +377,7 @@ export default async function handler(
           hostEmail: event.host_email,
           tags: event.tags,
           imageUrl: event.image_url,
+          token: event.token,
           createdAt: event.created_at,
           updatedAt: event.updated_at
         })) || [];

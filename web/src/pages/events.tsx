@@ -18,6 +18,7 @@ interface Event {
   hostName?: string;
   tags?: string[];
   imageUrl?: string;
+  token?: string;
   createdAt: string;
 }
 
@@ -29,6 +30,7 @@ const EventsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -39,6 +41,8 @@ const EventsPage: React.FC = () => {
 
   const fetchMyEvents = async () => {
     try {
+      // Fetch ALL events hosted by this user (both public and private)
+      // Private events should only be visible when the user is logged in
       const response = await fetch(`/api/events?hostId=${user?.id}&limit=50&orderBy=date&order=asc`);
       if (response.ok) {
         const data = await response.json();
@@ -112,6 +116,19 @@ const EventsPage: React.FC = () => {
     }
   };
 
+  const copyEventLink = async (eventId: string, token?: string) => {
+    if (!token) return;
+
+    const link = `${window.location.origin}/join/${eventId}?token=${token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedEventId(eventId);
+      setTimeout(() => setCopiedEventId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  };
+
   return (
     <div className="events-page">
       <Head>
@@ -122,20 +139,99 @@ const EventsPage: React.FC = () => {
       <Header activePage="events" />
 
       <div className="container">
-        {/* Public Events Section - Always shown first */}
-        <div className="section">
+        {/* My Events Section - Show first if user is logged in and has events */}
+        {user && filteredMyEvents.length > 0 && (
+          <div className="section">
+            <div className="section-header">
+              <div className="header-content">
+                <h1 className="section-title-large">My Events</h1>
+                <p className="subtitle">Events you're hosting</p>
+              </div>
+              <button
+                onClick={() => router.push('/')}
+                className="create-event-btn"
+              >
+                <span className="btn-icon">🎉</span>
+                Create Event
+              </button>
+            </div>
+            <div className="events-grid">
+              {filteredMyEvents.map((event: Event) => (
+                <div
+                  key={event.id}
+                  className="event-card my-event"
+                  onClick={() => handleEventClick(event.id)}
+                >
+                  {event.imageUrl && (
+                    <div className="event-image">
+                      <img src={event.imageUrl} alt={event.title} />
+                    </div>
+                  )}
+                  <div className="event-content">
+                    <div className="badges-container">
+                      <div className="host-badge">Your Event</div>
+                      {!event.isPublic && (
+                        <div className="private-badge">🔒 Private</div>
+                      )}
+                    </div>
+                    <h3 className="event-title">{event.title}</h3>
+
+                    <div className="event-meta">
+                      <div className="meta-item">
+                        📅 {formatDate(event.date, event.time)}
+                      </div>
+                      {event.location && (
+                        <div className="meta-item">
+                          📍 {event.location}
+                        </div>
+                      )}
+                      {event.maxAttendees && (
+                        <div className="meta-item">
+                          👥 {event.currentAttendees || 0} / {event.maxAttendees} attending
+                        </div>
+                      )}
+                    </div>
+
+                    {event.description && (
+                      <p className="event-description">
+                        {event.description.length > 150
+                          ? `${event.description.substring(0, 150)}...`
+                          : event.description}
+                      </p>
+                    )}
+
+                    {event.tags && event.tags.length > 0 && (
+                      <div className="event-tags">
+                        {event.tags.map((tag: string, index: number) => (
+                          <span key={index} className="tag">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Public Events Section */}
+        <div className={`section ${user && filteredMyEvents.length > 0 ? 'public-events-section' : ''}`}>
           <div className="section-header">
             <div className="header-content">
               <h1 className="section-title-large">Public Events</h1>
               <p className="subtitle">Discover and join exciting events happening around you</p>
             </div>
-            <button
-              onClick={() => router.push('/')}
-              className="create-event-btn"
-            >
-              <span className="btn-icon">🎉</span>
-              Create Event
-            </button>
+            {(!user || filteredMyEvents.length === 0) && (
+              <button
+                onClick={() => router.push('/')}
+                className="create-event-btn"
+              >
+                <span className="btn-icon">🎉</span>
+                Create Event
+              </button>
+            )}
           </div>
 
           <div className="search-section">
@@ -184,7 +280,6 @@ const EventsPage: React.FC = () => {
                   <div
                     key={event.id}
                     className="event-card"
-                    onClick={() => handleEventClick(event.id)}
                   >
                     {event.imageUrl && (
                       <div className="event-image">
@@ -232,6 +327,24 @@ const EventsPage: React.FC = () => {
                           ))}
                         </div>
                       )}
+
+                      {/* Show join link for public events that user didn't create */}
+                      {event.token && event.hostId !== user?.id && (
+                        <div className="event-join-section">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyEventLink(event.id, event.token);
+                            }}
+                            className="copy-link-btn"
+                          >
+                            {copiedEventId === event.id ? '✓ Copied!' : '🔗 Copy Join Link'}
+                          </button>
+                          <div className="event-token">
+                            Token: <code>{event.token}</code>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -239,68 +352,6 @@ const EventsPage: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* My Events Section - Only show if user is logged in and has events */}
-        {user && filteredMyEvents.length > 0 && (
-          <div className="section my-events-section">
-            <div className="section-header">
-              <h2 className="section-title-large">My Events</h2>
-            </div>
-            <div className="events-grid">
-              {filteredMyEvents.map((event: Event) => (
-                <div
-                  key={event.id}
-                  className="event-card my-event"
-                  onClick={() => handleEventClick(event.id)}
-                >
-                  {event.imageUrl && (
-                    <div className="event-image">
-                      <img src={event.imageUrl} alt={event.title} />
-                    </div>
-                  )}
-                  <div className="event-content">
-                    <div className="host-badge">Your Event</div>
-                    <h3 className="event-title">{event.title}</h3>
-
-                    <div className="event-meta">
-                      <div className="meta-item">
-                        📅 {formatDate(event.date, event.time)}
-                      </div>
-                      {event.location && (
-                        <div className="meta-item">
-                          📍 {event.location}
-                        </div>
-                      )}
-                      {event.maxAttendees && (
-                        <div className="meta-item">
-                          👥 {event.currentAttendees || 0} / {event.maxAttendees} attending
-                        </div>
-                      )}
-                    </div>
-
-                    {event.description && (
-                      <p className="event-description">
-                        {event.description.length > 150
-                          ? `${event.description.substring(0, 150)}...`
-                          : event.description}
-                      </p>
-                    )}
-
-                    {event.tags && event.tags.length > 0 && (
-                      <div className="event-tags">
-                        {event.tags.map((tag: string, index: number) => (
-                          <span key={index} className="tag">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <style>{`
@@ -402,7 +453,7 @@ const EventsPage: React.FC = () => {
           margin-bottom: 60px;
         }
 
-        .my-events-section {
+        .public-events-section {
           padding-top: 60px;
           border-top: 2px solid #e1e8ed;
         }
@@ -489,6 +540,13 @@ const EventsPage: React.FC = () => {
           border: 2px solid #667eea;
         }
 
+        .badges-container {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+        }
+
         .host-badge {
           display: inline-block;
           padding: 4px 12px;
@@ -497,7 +555,16 @@ const EventsPage: React.FC = () => {
           border-radius: 12px;
           font-size: 12px;
           font-weight: 600;
-          margin-bottom: 12px;
+        }
+
+        .private-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          background: #ff9800;
+          color: white;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
         }
 
         .event-image {
@@ -557,6 +624,52 @@ const EventsPage: React.FC = () => {
           border-radius: 12px;
           font-size: 12px;
           font-weight: 500;
+        }
+
+        .event-join-section {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #e1e8ed;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .copy-link-btn {
+          padding: 10px 16px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+
+        .copy-link-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .event-token {
+          font-size: 12px;
+          color: #657786;
+          text-align: center;
+        }
+
+        .event-token code {
+          background: #f0f0f0;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-family: 'Courier New', monospace;
+          font-size: 11px;
+          color: #667eea;
+          font-weight: 600;
         }
 
         .empty-state {

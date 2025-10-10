@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import EmailOnlyAuthModal from '../../components/EmailOnlyAuthModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Simple avatar options
 const AVATAR_OPTIONS = [
@@ -10,6 +12,7 @@ const AVATAR_OPTIONS = [
 
 const GENERATIONS = [
   { value: '', label: 'Prefer not to say' },
+  { value: 'gen-alpha', label: 'Gen Alpha (2013-present)' },
   { value: 'gen-z', label: 'Gen Z (1997-2012)' },
   { value: 'millennial', label: 'Millennial (1981-1996)' },
   { value: 'gen-x', label: 'Gen X (1965-1980)' },
@@ -20,8 +23,9 @@ const GENERATIONS = [
 const JoinEventPage: React.FC = () => {
   const router = useRouter();
   const { id, token } = router.query;
+  const { user } = useAuth();
 
-  const [step, setStep] = useState<'choose' | 'setup'>('choose');
+  const [step, setStep] = useState<'choose' | 'setup' | 'auth'>('choose');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [initials, setInitials] = useState('');
   const [email, setEmail] = useState('');
@@ -29,15 +33,24 @@ const JoinEventPage: React.FC = () => {
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Check if user already has a profile stored
+  // Check if user is already logged in via Supabase auth
+  useEffect(() => {
+    if (user && id && token) {
+      // User is logged in, go directly to event
+      router.push(`/event/${id}?token=${token}`);
+    }
+  }, [user, id, token, router]);
+
+  // Check if user already has a profile stored (legacy localStorage approach)
   useEffect(() => {
     const storedProfile = localStorage.getItem('userProfile');
-    if (storedProfile && id && token) {
+    if (storedProfile && id && token && !user) {
       // User already has a profile, go directly to event
       router.push(`/event/${id}?token=${token}`);
     }
-  }, [id, token, router]);
+  }, [id, token, user, router]);
 
   // Check if profile exists by email (for returning users)
   const checkExistingProfile = async (email: string) => {
@@ -169,9 +182,24 @@ const JoinEventPage: React.FC = () => {
           {step === 'choose' ? (
             <>
               <h2>Join the Event</h2>
-              <p className="subtitle">Choose how you'd like to appear:</p>
+              <p className="subtitle">Choose how you'd like to join:</p>
 
               <div className="options-container">
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="option-button primary"
+                >
+                  <div className="option-icon">📧</div>
+                  <div className="option-content">
+                    <strong>Quick Login with Email</strong>
+                    <span>Access the event instantly with your email</span>
+                  </div>
+                </button>
+
+                <div className="divider">
+                  <span>or join as a guest</span>
+                </div>
+
                 <button
                   onClick={handleChooseAnonymous}
                   className="option-button"
@@ -292,6 +320,16 @@ const JoinEventPage: React.FC = () => {
         </div>
       </div>
 
+      <EmailOnlyAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          if (id && token) {
+            router.push(`/event/${id}?token=${token}`);
+          }
+        }}
+      />
+
       <style jsx>{`
         .join-page {
           min-height: 100vh;
@@ -364,6 +402,48 @@ const JoinEventPage: React.FC = () => {
           background: #f0f2f5;
           border-color: #667eea;
           transform: translateY(-2px);
+        }
+
+        .option-button.primary {
+          border-color: #667eea;
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+
+        .option-button.primary:hover {
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+          border-color: #764ba2;
+        }
+
+        .divider {
+          text-align: center;
+          color: #657786;
+          font-size: 14px;
+          margin: 10px 0;
+          position: relative;
+        }
+
+        .divider::before,
+        .divider::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          width: 35%;
+          height: 1px;
+          background: #e1e8ed;
+        }
+
+        .divider::before {
+          left: 0;
+        }
+
+        .divider::after {
+          right: 0;
+        }
+
+        .divider span {
+          padding: 0 10px;
+          background: white;
+          position: relative;
         }
 
         .option-icon {

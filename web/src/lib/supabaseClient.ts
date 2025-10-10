@@ -21,9 +21,20 @@ export interface Post {
   created_at: string;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  generation?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Database schema type
 export interface Database {
-  api: {
+  public: {
     Tables: {
       events: {
         Row: Event;
@@ -41,6 +52,16 @@ export interface Database {
         };
         Update: Partial<Omit<Post, 'id' | 'created_at'>>;
       };
+      user_profiles: {
+        Row: UserProfile;
+        Insert: Omit<UserProfile, 'created_at' | 'updated_at'> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserProfile, 'id' | 'created_at' | 'updated_at'>> & {
+          updated_at?: string;
+        };
+      };
     };
     Views: {};
     Functions: {};
@@ -54,9 +75,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true, // Enable session persistence for authentication
     autoRefreshToken: true,
     detectSessionInUrl: true
-  },
-  db: {
-    schema: 'api'
   }
 });
 

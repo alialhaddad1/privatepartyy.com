@@ -8,6 +8,7 @@ interface UserProfile {
   display_name?: string;
   avatar_url?: string;
   bio?: string;
+  generation?: string;
 }
 
 interface AuthContextType {
@@ -17,8 +18,10 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithEmail: (email: string) => Promise<{ error: any; needsPassword?: boolean }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: any }>;
+  checkEmailHasPassword: (email: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,8 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
+      const { data, error } = await (supabase
+        .from('user_profiles') as any)
         .select('*')
         .eq('id', userId)
         .single();
@@ -67,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('Error fetching user profile:', error);
       } else {
-        setProfile(data);
+        setProfile(data as UserProfile);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -109,12 +112,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
+  const signInWithEmail = async (email: string) => {
+    try {
+      // First check if user exists and has a password set
+      const hasPassword = await checkEmailHasPassword(email);
+
+      if (hasPassword) {
+        return { error: null, needsPassword: true };
+      }
+
+      // User exists but no password - send magic link for passwordless login
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+        }
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { error: null, needsPassword: false };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const checkEmailHasPassword = async (email: string): Promise<boolean> => {
+    try {
+      // Try to get user by email - this is a workaround since Supabase doesn't expose password status directly
+      // We'll make an API call to check if email exists in auth.users and if it has a password
+      const response = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.hasPassword || false;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking email password status:', error);
+      return false;
+    }
+  };
+
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
     try {
-      const { error } = await supabase
-        .from('user_profiles')
+      // Type assertion for Supabase update - the Database type should include user_profiles
+      const { error } = await (supabase
+        .from('user_profiles') as any)
         .update({
           ...updates,
           updated_at: new Date().toISOString()
@@ -138,8 +193,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signUp,
     signIn,
+    signInWithEmail,
     signOut,
-    updateProfile
+    updateProfile,
+    checkEmailHasPassword
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
