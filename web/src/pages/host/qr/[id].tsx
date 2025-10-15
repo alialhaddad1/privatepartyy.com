@@ -192,6 +192,19 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       };
     }
 
+    // Check if event has a token
+    if (!event.token) {
+      console.error('Event found but has no token:', event);
+      return {
+        props: {
+          event: null,
+          error: 'Event is missing a token. Please recreate the event.'
+        }
+      };
+    }
+
+    console.log('Event loaded with token:', { id: event.id, token: event.token });
+
     // Generate QR code URL for the event
     const protocol = context.req.headers.host?.includes('localhost') ? 'http' : 'https';
     const baseUrl = `${protocol}://${context.req.headers.host}`;
