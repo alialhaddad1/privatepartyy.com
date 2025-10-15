@@ -196,6 +196,25 @@ const JoinEventPage: React.FC = () => {
     setError('');
   };
 
+  const handleQuickLogin = () => {
+    // If user is already logged in, redirect them directly to the event
+    if (user) {
+      const finalEventId = eventId || queryId;
+      const finalEventToken = eventToken || queryToken;
+
+      if (finalEventId && finalEventToken) {
+        console.log('User already logged in, redirecting to event');
+        router.push(`/event/${finalEventId}?token=${finalEventToken}`);
+      } else {
+        console.error('Cannot redirect: missing event info', { eventId, eventToken, queryId, queryToken });
+        setError('Missing event information. Please try again.');
+      }
+    } else {
+      // User not logged in, show the auth modal
+      setShowAuthModal(true);
+    }
+  };
+
   return (
     <div className="join-page">
       <Head>
@@ -220,7 +239,7 @@ const JoinEventPage: React.FC = () => {
 
               <div className="options-container">
                 <button
-                  onClick={() => setShowAuthModal(true)}
+                  onClick={handleQuickLogin}
                   className="option-button primary"
                 >
                   <div className="option-icon">📧</div>
