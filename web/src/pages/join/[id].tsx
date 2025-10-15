@@ -196,17 +196,32 @@ const JoinEventPage: React.FC = () => {
     setError('');
   };
 
-  const handleQuickLogin = () => {
+  const handleQuickLogin = async () => {
     // If user is already logged in, redirect them directly to the event
     if (user) {
       const finalEventId = eventId || queryId;
-      const finalEventToken = eventToken || queryToken;
+      let finalEventToken = eventToken || queryToken;
+
+      // If token is missing, fetch it from the API
+      if (finalEventId && !finalEventToken) {
+        console.log('Token missing, fetching event data...');
+        try {
+          const response = await fetch(`/api/events/${finalEventId}`);
+          if (response.ok) {
+            const data = await response.json();
+            finalEventToken = data.token;
+            console.log('Fetched token:', finalEventToken);
+          }
+        } catch (err) {
+          console.error('Error fetching event token:', err);
+        }
+      }
 
       if (finalEventId && finalEventToken) {
         console.log('User already logged in, redirecting to event');
         router.push(`/event/${finalEventId}?token=${finalEventToken}`);
       } else {
-        console.error('Cannot redirect: missing event info', { eventId, eventToken, queryId, queryToken });
+        console.error('Cannot redirect: missing event info', { eventId, eventToken, queryId, queryToken, finalEventToken });
         setError('Missing event information. Please try again.');
       }
     } else {
