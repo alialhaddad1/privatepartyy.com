@@ -137,7 +137,12 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    // Try api schema first, then public schema
+    let event = null;
+    let eventError = null;
+
+    // Try api schema
+    const supabaseApi = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -147,15 +152,38 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       }
     });
 
-    // Fetch event data directly from database
-    const { data: event, error } = await supabase
+    const { data: apiEvent, error: apiError } = await supabaseApi
       .from('events')
       .select('id, title, token')
       .eq('id', id)
       .single();
 
-    if (error || !event) {
-      console.error('Error fetching event:', error);
+    if (apiEvent) {
+      event = apiEvent;
+    } else {
+      // Try public schema
+      const supabasePublic = createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      const { data: publicEvent, error: publicError } = await supabasePublic
+        .from('events')
+        .select('id, title, token')
+        .eq('id', id)
+        .single();
+
+      if (publicEvent) {
+        event = publicEvent;
+      } else {
+        eventError = publicError || apiError;
+      }
+    }
+
+    if (!event) {
+      console.error('Error fetching event from both schemas:', eventError);
       return {
         props: {
           event: null,
