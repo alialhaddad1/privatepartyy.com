@@ -58,13 +58,13 @@ export default async function handler(
       // It's a UUID, use directly
       eventId = eventIdOrToken;
       // Determine which schema has the event
-      const eventResult = await tryBothSchemas((client) =>
+      const eventResult = await tryBothSchemas<{ id: string }>((client) =>
         client.from('events').select('id').eq('id', eventIdOrToken).single()
       );
       supabase = eventResult.schema === 'api' ? supabaseApi : supabasePublic;
     } else {
       // It's a token, look up the event in both schemas
-      const eventResult = await tryBothSchemas((client) =>
+      const eventResult = await tryBothSchemas<{ id: string }>((client) =>
         client.from('events').select('id').eq('token', eventIdOrToken).single()
       );
 
