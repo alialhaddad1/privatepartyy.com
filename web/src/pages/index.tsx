@@ -50,6 +50,13 @@ const LandingPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
+
+        // Store event ID in localStorage so we can identify the user as the creator
+        const createdEvents = localStorage.getItem('createdEvents');
+        const events = createdEvents ? JSON.parse(createdEvents) : [];
+        events.push(data.eventId);
+        localStorage.setItem('createdEvents', JSON.stringify(events));
+
         // Close modal and redirect to QR code page to show the host the QR code
         setShowCreateModal(false);
         router.push(`/host/qr/${data.eventId}?token=${data.token}`);

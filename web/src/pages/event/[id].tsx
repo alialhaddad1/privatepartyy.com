@@ -96,12 +96,43 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
         const response = await fetch(`/api/events/${id}?token=${token}`);
         if (response.ok) {
           const data = await response.json();
-          setEventData(data);
+          setEventData({
+            id: data.id,
+            name: data.name || data.title,
+            description: data.description || '',
+            hostId: data.host_id || '',
+            hostName: data.host_name || '',
+            location: data.location || '',
+            date: data.date || '',
+            isActive: true,
+          });
 
           // Check if current user is the host
-          const currentUserId = serverUser?.id || localUser?.id;
-          if (currentUserId && data.host_id) {
-            setIsUserHost(currentUserId === data.host_id);
+          // Match by ID OR by email (since localStorage users have different IDs each time)
+          const currentUser = serverUser || localUser;
+          if (currentUser && data.host_id) {
+            const isHostById = currentUser.id === data.host_id;
+            const isHostByEmail = currentUser.id && localUser?.id &&
+                                   data.host_email &&
+                                   localUser.id.includes('user_'); // Check if it's a localStorage user
+
+            // For localStorage users, check if the event's token matches the current event
+            // This is a workaround: if they're viewing the event with the token, and there's no auth user,
+            // we can check localStorage for a flag that they created this event
+            let isCreator = false;
+            if (typeof window !== 'undefined') {
+              const createdEvents = localStorage.getItem('createdEvents');
+              if (createdEvents) {
+                try {
+                  const events = JSON.parse(createdEvents);
+                  isCreator = events.includes(data.id);
+                } catch (e) {
+                  console.error('Error parsing createdEvents:', e);
+                }
+              }
+            }
+
+            setIsUserHost(isHostById || isCreator);
           }
         }
       } catch (err) {
@@ -938,26 +969,59 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
-  // For now, return minimal props and let client-side handle data fetching
-  // This is because the API endpoints for individual events don't exist yet
-  return {
-    props: {
-      initialPosts: [],
-      event: {
-        id: id as string,
-        name: 'Loading...',
-        description: '',
-        hostId: '',
-        hostName: '',
-        location: '',
-        date: '',
-        isActive: true,
+  try {
+    // Build the base URL
+    const protocol = context.req.headers['x-forwarded-proto'] || 'http';
+    const host = context.req.headers.host;
+    const baseUrl = `${protocol}://${host}`;
+
+    // Fetch event data
+    const eventResponse = await fetch(`${baseUrl}/api/events/${id}?token=${token}`);
+
+    if (!eventResponse.ok) {
+      // Event not found or invalid token
+      return {
+        redirect: {
+          destination: `/join/${id}`,
+          permanent: false,
+        },
+      };
+    }
+
+    const eventData = await eventResponse.json();
+
+    // Fetch posts
+    const postsResponse = await fetch(`${baseUrl}/api/events/${id}/posts?token=${token}`);
+    const postsData = postsResponse.ok ? await postsResponse.json() : { posts: [] };
+
+    return {
+      props: {
+        initialPosts: postsData.posts || [],
+        event: {
+          id: eventData.id,
+          name: eventData.name || eventData.title,
+          description: eventData.description || '',
+          hostId: eventData.host_id || '',
+          hostName: eventData.host_name || '',
+          location: eventData.location || '',
+          date: eventData.date || '',
+          isActive: true,
+        },
+        user: null,
+        token: token as string,
+        isHost: false, // Will be determined client-side
       },
-      user: null,
-      token: token as string,
-      isHost: false,
-    },
-  };
+    };
+  } catch (error) {
+    console.error('Error in getServerSideProps:', error);
+    // On error, redirect to join page
+    return {
+      redirect: {
+        destination: `/join/${id}`,
+        permanent: false,
+      },
+    };
+  }
 };
 
 export default EventFeedPage;
