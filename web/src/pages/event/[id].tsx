@@ -183,12 +183,6 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   }, [id, token, router]);
 
   const handleLike = async (postId: string) => {
-    if (!user?.isSubscribed) {
-      setError('Subscribe to PrivatePartyy to like posts');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
     try {
       // Optimistically update UI
       setPosts(prev => prev.map(post => {
@@ -232,24 +226,12 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   };
 
   const handleComment = async (postId: string) => {
-    if (!user?.isSubscribed) {
-      setError('Subscribe to PrivatePartyy to comment on posts');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
     // Navigate to post detail or open comment modal
     // For now, we'll just show an alert
     alert('Comment functionality would open a modal or navigate to post detail');
   };
 
   const handleDM = async (userId: string) => {
-    if (!user?.isSubscribed) {
-      setError('Subscribe to PrivatePartyy to send direct messages');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
     try {
       // Create or find existing DM thread
       const response = await fetch('/api/dms/threads', {
@@ -479,7 +461,6 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                       <button
                         onClick={() => handleDM(post.authorId)}
                         className="dm-button"
-                        disabled={!user.isSubscribed}
                       >
                         Message
                       </button>
@@ -503,25 +484,17 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                     <button
                       onClick={() => handleLike(post.id)}
                       className={`action-button like-button ${post.isLiked ? 'liked' : ''}`}
-                      disabled={!user?.isSubscribed}
                     >
                       ❤️ {post.likes}
                     </button>
-                    
+
                     <button
                       onClick={() => handleComment(post.id)}
                       className="action-button comment-button"
-                      disabled={!user?.isSubscribed}
                     >
                       💬 {post.comments}
                     </button>
                   </div>
-
-                  {!user?.isSubscribed && (
-                    <div className="subscription-overlay">
-                      <p>Subscribe to interact with posts</p>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

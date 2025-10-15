@@ -37,6 +37,7 @@ const JoinEventPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [allowDMs, setAllowDMs] = useState(true);
 
   // Update state when query params are available
   useEffect(() => {
@@ -167,6 +168,25 @@ const JoinEventPage: React.FC = () => {
 
       // Store in localStorage for immediate access
       localStorage.setItem('userProfile', JSON.stringify(userProfile));
+
+      // Save DM preference
+      try {
+        await fetch('/api/events/user-preferences', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventId: eventId || queryId,
+            userId: userProfile.id,
+            userEmail: userProfile.email,
+            allowDMs,
+          }),
+        });
+      } catch (err) {
+        console.warn('Failed to save DM preference:', err);
+        // Continue anyway
+      }
 
       // Redirect to event feed - use window.location for more reliable redirect
       console.log('About to redirect with:', { eventId, eventToken, queryId, queryToken });
@@ -364,6 +384,18 @@ const JoinEventPage: React.FC = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={allowDMs}
+                    onChange={(e) => setAllowDMs(e.target.checked)}
+                    className="checkbox-input"
+                  />
+                  <span>Allow other attendees to send me direct messages</span>
+                </label>
               </div>
 
               {error && (
@@ -646,6 +678,36 @@ const JoinEventPage: React.FC = () => {
           background: #e8ecff;
           transform: scale(1.1);
           box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          padding: 16px;
+          background: #f8f9fa;
+          border-radius: 12px;
+          border: 2px solid #e1e8ed;
+          transition: all 0.2s;
+        }
+
+        .checkbox-label:hover {
+          background: #f0f2f5;
+          border-color: #667eea;
+        }
+
+        .checkbox-input {
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .checkbox-label span {
+          font-size: 14px;
+          color: #1a1a1a;
+          flex: 1;
         }
 
         .error-message {
