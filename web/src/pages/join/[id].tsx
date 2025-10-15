@@ -22,9 +22,12 @@ const GENERATIONS = [
 
 const JoinEventPage: React.FC = () => {
   const router = useRouter();
-  const { id, token } = router.query;
+  const { id: queryId, token: queryToken } = router.query;
   const { user } = useAuth();
 
+  // Store id and token in state once available from query
+  const [eventId, setEventId] = useState<string>('');
+  const [eventToken, setEventToken] = useState<string>('');
   const [step, setStep] = useState<'choose' | 'setup' | 'auth'>('choose');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [initials, setInitials] = useState('');
@@ -35,22 +38,32 @@ const JoinEventPage: React.FC = () => {
   const [error, setError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Update state when query params are available
+  useEffect(() => {
+    if (queryId && typeof queryId === 'string') {
+      setEventId(queryId);
+    }
+    if (queryToken && typeof queryToken === 'string') {
+      setEventToken(queryToken);
+    }
+  }, [queryId, queryToken]);
+
   // Check if user is already logged in via Supabase auth
   useEffect(() => {
-    if (user && id && token) {
+    if (user && eventId && eventToken) {
       // User is logged in, go directly to event
-      router.push(`/event/${id}?token=${token}`);
+      router.push(`/event/${eventId}?token=${eventToken}`);
     }
-  }, [user, id, token, router]);
+  }, [user, eventId, eventToken, router]);
 
   // Check if user already has a profile stored (legacy localStorage approach)
   useEffect(() => {
     const storedProfile = localStorage.getItem('userProfile');
-    if (storedProfile && id && token && !user) {
+    if (storedProfile && eventId && eventToken && !user) {
       // User already has a profile, go directly to event
-      router.push(`/event/${id}?token=${token}`);
+      router.push(`/event/${eventId}?token=${eventToken}`);
     }
-  }, [id, token, user, router]);
+  }, [eventId, eventToken, user, router]);
 
   // Check if profile exists by email (for returning users)
   const checkExistingProfile = async (email: string) => {
@@ -153,8 +166,8 @@ const JoinEventPage: React.FC = () => {
       localStorage.setItem('userProfile', JSON.stringify(userProfile));
 
       // Redirect to event feed - use window.location for more reliable redirect
-      if (id && token) {
-        window.location.href = `/event/${id}?token=${token}`;
+      if (eventId && eventToken) {
+        window.location.href = `/event/${eventId}?token=${eventToken}`;
       } else {
         setError('Missing event information. Please try again.');
         setLoading(false);
@@ -333,8 +346,8 @@ const JoinEventPage: React.FC = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={() => {
-          if (id && token) {
-            router.push(`/event/${id}?token=${token}`);
+          if (eventId && eventToken) {
+            router.push(`/event/${eventId}?token=${eventToken}`);
           }
         }}
       />
