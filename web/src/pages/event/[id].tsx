@@ -62,6 +62,9 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [localUser, setLocalUser] = useState<User | null>(null);
+  const [eventData, setEventData] = useState<EventData>(event);
+  const [isUserHost, setIsUserHost] = useState(isHost);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // Load user profile from localStorage
   useEffect(() => {
@@ -85,6 +88,31 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
       }
     }
   }, [serverUser, id, token, router]);
+
+  // Fetch event data to get host information
+  useEffect(() => {
+    const fetchEventData = async () => {
+      try {
+        const response = await fetch(`/api/events/${id}?token=${token}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEventData(data);
+
+          // Check if current user is the host
+          const currentUserId = serverUser?.id || localUser?.id;
+          if (currentUserId && data.host_id) {
+            setIsUserHost(currentUserId === data.host_id);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching event data:', err);
+      }
+    };
+
+    if (id && token) {
+      fetchEventData();
+    }
+  }, [id, token, serverUser, localUser]);
 
   // Use server user if available, otherwise use local user
   const user = serverUser || localUser;
@@ -226,6 +254,30 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
     fetchPosts(false);
   };
 
+  const handleCopyLink = async () => {
+    const eventUrl = `${window.location.origin}/join/${id}?token=${token}`;
+    try {
+      await navigator.clipboard.writeText(eventUrl);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = eventUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   // Set up polling for new posts
   useEffect(() => {
     const startPolling = () => {
@@ -271,7 +323,7 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
     };
   }, [pollingInterval, fetchPosts]);
 
-  if (!event) {
+  if (!eventData) {
     return (
       <div className="event-page error">
         <Head>
@@ -287,35 +339,43 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   return (
     <div className="event-page">
       <Head>
-        <title>{event.name} - PrivatePartyy</title>
-        <meta name="description" content={event.description || `Join ${event.name} on PrivatePartyy`} />
+        <title>{eventData.name} - PrivatePartyy</title>
+        <meta name="description" content={eventData.description || `Join ${eventData.name} on PrivatePartyy`} />
       </Head>
 
       <Header />
 
       <div className="event-header">
         <div className="event-info">
-          <h1 className="event-title">{event.name}</h1>
-          {event.description && (
-            <p className="event-description">{event.description}</p>
+          <h1 className="event-title">{eventData.name}</h1>
+          {eventData.description && (
+            <p className="event-description">{eventData.description}</p>
           )}
           <div className="event-meta">
-            <span className="host-info">Hosted by {event.hostName}</span>
-            {event.location && <span className="location">{event.location}</span>}
-            {event.date && <span className="date">{new Date(event.date).toLocaleDateString()}</span>}
+            <span className="host-info">Hosted by {eventData.hostName}</span>
+            {eventData.location && <span className="location">{eventData.location}</span>}
+            {eventData.date && <span className="date">{new Date(eventData.date).toLocaleDateString()}</span>}
           </div>
         </div>
 
         <div className="event-actions">
-          {isHost && (
-            <button 
-              onClick={() => router.push(`/host/event/${id}/qr?token=${token}`)}
-              className="qr-button"
-            >
-              Show QR Code
-            </button>
+          {isUserHost && (
+            <>
+              <button
+                onClick={() => router.push(`/host/qr/${id}?token=${token}`)}
+                className="qr-button"
+              >
+                Show QR Code
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className="copy-link-button"
+              >
+                {copySuccess ? '✓ Copied!' : '🔗 Copy Link'}
+              </button>
+            </>
           )}
-          
+
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -440,7 +500,7 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
         {!loading && posts.length === 0 && (
           <div className="empty-state">
             <h3>No posts yet</h3>
-            <p>Be the first to share something at {event.name}!</p>
+            <p>Be the first to share something at {eventData.name}!</p>
             {user && !showUpload && (
               <button
                 onClick={() => setShowUpload(true)}
@@ -537,6 +597,22 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 
         .qr-button:hover {
           background-color: #138496;
+        }
+
+        .copy-link-button {
+          padding: 10px 20px;
+          background-color: #6610f2;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: background-color 0.2s;
+        }
+
+        .copy-link-button:hover {
+          background-color: #560bd0;
         }
 
         .refresh-button {

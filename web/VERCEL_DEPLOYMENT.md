@@ -127,21 +127,27 @@ In your Vercel project settings, add the following environment variables:
 
 1. Log into your [GoDaddy Domain Manager](https://dcc.godaddy.com/domains)
 2. Find `privatepartyy.com` and click **DNS**
-3. Add the following records (as shown in Vercel):
+3. **First, check for existing records:**
+   - Look for any existing `A`, `CNAME`, or `AAAA` records for `@` and `www`
+   - **Delete or edit** any conflicting records (especially the default GoDaddy parking page records)
+
+4. Add/Update the following records (as shown in Vercel):
 
    **For Root Domain (privatepartyy.com):**
    - Type: `A`
    - Name: `@`
    - Value: `76.76.21.21` (Vercel's IP)
    - TTL: 600 seconds
+   - **Note:** If an `A` record for `@` exists, click the pencil icon to edit it instead of adding a new one
 
    **For WWW Subdomain:**
    - Type: `CNAME`
    - Name: `www`
    - Value: `cname.vercel-dns.com.`
    - TTL: 600 seconds
+   - **Note:** If a `CNAME` or `A` record for `www` exists, **delete it first**, then add the new CNAME record
 
-4. Save your DNS settings
+5. Save your DNS settings
 
 **Note:** DNS propagation can take 24-48 hours but usually completes within a few hours.
 
@@ -222,6 +228,11 @@ Vercel automatically configures these cron jobs from `vercel.json`. However, you
    - DNS can take up to 48 hours to propagate
    - Use [DNS Checker](https://dnschecker.org/) to verify propagation
    - Clear your browser cache
+
+5. **"www" record conflicts with another record**
+   - Delete the existing "www" record in GoDaddy DNS settings
+   - GoDaddy often creates default parking page records that must be removed
+   - You can only have ONE record per name (can't have multiple "www" records)
 
 5. **Build failures**
    - Check build logs in Vercel dashboard
