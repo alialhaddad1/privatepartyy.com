@@ -109,7 +109,7 @@ export default async function handler(
         }
 
         // Fetch media items for multi-media posts
-        const postIds = (posts || []).map(post => post.id);
+        const postIds = (posts || []).map((post: any) => post.id);
         let mediaItemsMap: { [key: string]: any[] } = {};
         let userLikesMap: { [key: string]: boolean } = {};
 
@@ -156,7 +156,7 @@ export default async function handler(
         }
 
         // Transform snake_case to camelCase for frontend
-        const transformedPosts = (posts || []).map(post => {
+        const transformedPosts = (posts || []).map((post: any) => {
           // Check if this post has multiple media items
           const hasMultipleMedia = mediaItemsMap[post.id] && mediaItemsMap[post.id].length > 0;
 
