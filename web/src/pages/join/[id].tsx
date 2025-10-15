@@ -358,8 +358,13 @@ const JoinEventPage: React.FC = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={() => {
-          if (eventId && eventToken) {
-            router.push(`/event/${eventId}?token=${eventToken}`);
+          const finalEventId = eventId || queryId;
+          const finalEventToken = eventToken || queryToken;
+
+          if (finalEventId && finalEventToken) {
+            router.push(`/event/${finalEventId}?token=${finalEventToken}`);
+          } else {
+            console.error('Cannot redirect: missing event info', { eventId, eventToken, queryId, queryToken });
           }
         }}
       />

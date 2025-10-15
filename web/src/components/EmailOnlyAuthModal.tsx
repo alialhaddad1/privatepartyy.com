@@ -21,11 +21,13 @@ const EmailOnlyAuthModal: React.FC<EmailOnlyAuthModalProps> = ({ isOpen, onClose
     if (isOpen && user) {
       setMessage('You are already logged in!');
       setTimeout(() => {
-        if (onSuccess) onSuccess();
-        handleClose();
+        if (onSuccess) {
+          onSuccess();
+        }
+        onClose();
       }, 500);
     }
-  }, [isOpen, user, onSuccess]);
+  }, [isOpen, user, onSuccess, onClose]);
 
   if (!isOpen) return null;
 
