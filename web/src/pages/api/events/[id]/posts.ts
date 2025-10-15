@@ -121,7 +121,7 @@ export default async function handler(
             .order('display_order', { ascending: true });
 
           if (!mediaError && mediaItems) {
-            mediaItemsMap = mediaItems.reduce((acc, item) => {
+            mediaItemsMap = mediaItems.reduce((acc: { [key: string]: any[] }, item: any) => {
               if (!acc[item.post_id]) {
                 acc[item.post_id] = [];
               }
@@ -147,7 +147,7 @@ export default async function handler(
               .eq('user_id', userId);
 
             if (!likesError && userLikes) {
-              userLikesMap = userLikes.reduce((acc, like) => {
+              userLikesMap = userLikes.reduce((acc: { [key: string]: boolean }, like: any) => {
                 acc[like.post_id] = true;
                 return acc;
               }, {} as { [key: string]: boolean });
