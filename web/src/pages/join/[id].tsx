@@ -40,10 +40,13 @@ const JoinEventPage: React.FC = () => {
 
   // Update state when query params are available
   useEffect(() => {
+    console.log('Query params:', { queryId, queryToken });
     if (queryId && typeof queryId === 'string') {
+      console.log('Setting eventId:', queryId);
       setEventId(queryId);
     }
     if (queryToken && typeof queryToken === 'string') {
+      console.log('Setting eventToken:', queryToken);
       setEventToken(queryToken);
     }
   }, [queryId, queryToken]);
@@ -166,9 +169,18 @@ const JoinEventPage: React.FC = () => {
       localStorage.setItem('userProfile', JSON.stringify(userProfile));
 
       // Redirect to event feed - use window.location for more reliable redirect
-      if (eventId && eventToken) {
-        window.location.href = `/event/${eventId}?token=${eventToken}`;
+      console.log('About to redirect with:', { eventId, eventToken, queryId, queryToken });
+
+      // Use the most reliable source - prefer state, fall back to query
+      const finalEventId = eventId || queryId;
+      const finalEventToken = eventToken || queryToken;
+
+      if (finalEventId && finalEventToken) {
+        const redirectUrl = `/event/${finalEventId}?token=${finalEventToken}`;
+        console.log('Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
       } else {
+        console.error('Missing params:', { eventId, eventToken, queryId, queryToken });
         setError('Missing event information. Please try again.');
         setLoading(false);
       }
