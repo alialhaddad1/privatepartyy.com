@@ -181,6 +181,10 @@ const JoinEventPage: React.FC = () => {
 
           {step === 'choose' ? (
             <>
+              <button onClick={() => router.back()} className="back-button">
+                ← Back
+              </button>
+
               <h2>Join the Event</h2>
               <p className="subtitle">Choose how you'd like to join:</p>
 

@@ -209,6 +209,30 @@ const EventsPage: React.FC = () => {
                         ))}
                       </div>
                     )}
+
+                    {/* Host actions for My Events */}
+                    {event.token && (
+                      <div className="host-actions">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/host/qr/${event.id}?token=${event.token}`);
+                          }}
+                          className="action-btn primary-btn"
+                        >
+                          📱 Show QR Code
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyEventLink(event.id, event.token);
+                          }}
+                          className="action-btn secondary-btn"
+                        >
+                          {copiedEventId === event.id ? '✓ Copied!' : '🔗 Copy Link'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -670,6 +694,50 @@ const EventsPage: React.FC = () => {
           font-size: 11px;
           color: #667eea;
           font-weight: 600;
+        }
+
+        .host-actions {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #e1e8ed;
+          display: flex;
+          gap: 10px;
+        }
+
+        .action-btn {
+          flex: 1;
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+
+        .primary-btn {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+        }
+
+        .primary-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .secondary-btn {
+          background: white;
+          color: #667eea;
+          border: 2px solid #667eea;
+        }
+
+        .secondary-btn:hover {
+          background: #f0f0ff;
+          transform: translateY(-2px);
         }
 
         .empty-state {
