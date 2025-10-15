@@ -125,7 +125,7 @@ const JoinEventPage: React.FC = () => {
       } else {
         // Create new profile
         userProfile = {
-          id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
           name: isAnonymous ? 'Anonymous' : initials.toUpperCase(),
           email: email.trim().toLowerCase(),
           generation: generation || null,
@@ -152,8 +152,13 @@ const JoinEventPage: React.FC = () => {
       // Store in localStorage for immediate access
       localStorage.setItem('userProfile', JSON.stringify(userProfile));
 
-      // Redirect to event feed
-      router.push(`/event/${id}?token=${token}`);
+      // Redirect to event feed - use window.location for more reliable redirect
+      if (id && token) {
+        window.location.href = `/event/${id}?token=${token}`;
+      } else {
+        setError('Missing event information. Please try again.');
+        setLoading(false);
+      }
     } catch (err) {
       console.error('Error joining event:', err);
       setError('Failed to join event. Please try again.');
@@ -547,6 +552,8 @@ const JoinEventPage: React.FC = () => {
           display: grid;
           grid-template-columns: repeat(8, 1fr);
           gap: 8px;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .avatar-option {
@@ -561,6 +568,8 @@ const JoinEventPage: React.FC = () => {
           display: flex;
           align-items: center;
           justify-content: center;
+          overflow: hidden;
+          box-sizing: border-box;
         }
 
         .avatar-option:hover {
@@ -629,16 +638,22 @@ const JoinEventPage: React.FC = () => {
 
           .avatar-grid {
             grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
           }
 
           .avatar-option {
-            font-size: 20px;
+            font-size: 18px;
           }
         }
 
         @media (max-width: 400px) {
           .avatar-grid {
             grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+          }
+
+          .avatar-option {
+            font-size: 16px;
           }
         }
       `}</style>
