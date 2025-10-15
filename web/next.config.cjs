@@ -4,6 +4,8 @@ const nextConfig = {
     appDir: true
   },
   reactStrictMode: true,
+  // Output standalone for optimized Vercel deployment
+  output: 'standalone',
   images: {
     domains: [
       'supabase.co',

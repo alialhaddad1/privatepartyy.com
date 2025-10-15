@@ -43,8 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check if user has encrypted_password (indicates password-based auth)
     // If user was created with magic link or OAuth, they won't have this
     const hasPassword = user.app_metadata?.provider === 'email' &&
-                       user.encrypted_password !== undefined &&
-                       user.encrypted_password !== '';
+                       (user as any).encrypted_password !== undefined &&
+                       (user as any).encrypted_password !== '';
 
     return res.status(200).json({
       exists: true,
