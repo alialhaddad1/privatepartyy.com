@@ -128,27 +128,69 @@ const HostQRPage: React.FC<HostQRPageProps> = ({ event, error }) => {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const { id } = context.params!;
-  
+
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/events/${id}/qr`);
-    
-    if (!response.ok) {
+    // Import the Supabase client and QRCode on the server side
+    const { createClient } = await import('@supabase/supabase-js');
+    const QRCode = await import('qrcode');
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      },
+      db: {
+        schema: 'api'
+      }
+    });
+
+    // Fetch event data directly from database
+    const { data: event, error } = await supabase
+      .from('events')
+      .select('id, title, token')
+      .eq('id', id)
+      .single();
+
+    if (error || !event) {
+      console.error('Error fetching event:', error);
       return {
         props: {
           event: null,
-          error: 'Failed to fetch event QR data'
+          error: 'Event not found'
         }
       };
     }
 
-    const event = await response.json();
-    
+    // Generate QR code URL for the event
+    const protocol = context.req.headers.host?.includes('localhost') ? 'http' : 'https';
+    const baseUrl = `${protocol}://${context.req.headers.host}`;
+    const eventUrl = `${baseUrl}/join/${event.id}?token=${event.token}`;
+
+    // Generate QR code as data URL
+    const qrDataUrl = await QRCode.default.toDataURL(eventUrl, {
+      width: 400,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+
     return {
       props: {
-        event
+        event: {
+          id: event.id,
+          name: event.title,
+          token: event.token,
+          qrUrl: qrDataUrl
+        }
       }
     };
   } catch (error) {
+    console.error('Error in getServerSideProps:', error);
     return {
       props: {
         event: null,
