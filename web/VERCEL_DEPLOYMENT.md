@@ -29,12 +29,15 @@ npm install
 
 ## Step 3: Deploy to Vercel
 
+**IMPORTANT:** Before deploying, you MUST configure environment variables (Step 4) to avoid build failures. The build will fail if Supabase environment variables are not set.
+
 ### Option A: Deploy via Vercel Dashboard
 
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
 2. Click "Add New Project"
 3. Import your Git repository
-4. Configure the project:
+4. **BEFORE DEPLOYING**: Configure environment variables (see Step 4 below)
+5. Configure the project:
    - **Framework Preset**: Next.js
    - **Root Directory**: `web`
    - **Build Command**: `npm run build`
@@ -57,6 +60,8 @@ vercel
 ```
 
 ## Step 4: Configure Environment Variables
+
+**CRITICAL:** These environment variables MUST be configured before your first deployment, otherwise the build will fail.
 
 In your Vercel project settings, add the following environment variables:
 
