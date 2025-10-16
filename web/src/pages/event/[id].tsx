@@ -67,12 +67,6 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 }) => {
   const router = useRouter();
   const { id } = router.query;
-
-  console.log(`🎬 [Event Page] Initializing with ${initialPosts.length} initial posts`);
-  if (initialPosts.length > 0) {
-    console.log(`📋 [Event Page] Initial post IDs: ${initialPosts.map(p => p.id).join(', ')}`);
-  }
-
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -165,6 +159,14 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 
   // Use server user if available, otherwise use local user
   const user = serverUser || localUser;
+
+  // One-time logging on mount
+  useEffect(() => {
+    console.log(`🎬 [Event Page] Mounted with ${initialPosts.length} initial posts`);
+    if (initialPosts.length > 0) {
+      console.log(`📋 [Event Page] Initial post IDs: ${initialPosts.map(p => p.id).join(', ')}`);
+    }
+  }, []); // Empty deps array - only run once on mount
 
   const fetchPosts = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);

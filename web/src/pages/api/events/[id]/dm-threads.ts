@@ -141,7 +141,12 @@ export default async function handler(
           otherUserAvatar
         } = req.body;
 
+        console.log(`💬 [DM Threads] Creating/finding DM thread for event ${eventId}`);
+        console.log(`   Current user: ${currentUserId} (${currentUserName})`);
+        console.log(`   Other user: ${otherUserId} (${otherUserName})`);
+
         if (!currentUserId || !currentUserName || !otherUserId || !otherUserName) {
+          console.error('❌ [DM Threads] Missing required fields:', { currentUserId, currentUserName, otherUserId, otherUserName });
           return res.status(400).json({
             error: 'Missing required fields'
           });
@@ -149,20 +154,29 @@ export default async function handler(
 
         // Prevent self-DM
         if (currentUserId === otherUserId) {
+          console.error('❌ [DM Threads] User attempting to DM themselves');
           return res.status(400).json({ error: 'Cannot DM yourself' });
         }
 
         // Check if the recipient allows DMs for this event
-        const { data: recipientPrefs } = await supabase
-          .from('event_user_preferences')
-          .select('allow_dms')
-          .eq('event_id', eventId)
-          .eq('user_id', otherUserId)
-          .single();
+        // Try both schemas for preferences
+        const prefsResult = await tryBothSchemas<{ allow_dms: boolean }>((client) =>
+          client.from('event_user_preferences')
+            .select('allow_dms')
+            .eq('event_id', eventId)
+            .eq('user_id', otherUserId)
+            .single()
+        );
 
-        const allowsDMs = recipientPrefs?.allow_dms ?? true; // Default to true if no preference set
+        // Default to true if no preference found (PGRST116 means no rows)
+        const allowsDMs = prefsResult.error?.code === 'PGRST116'
+          ? true
+          : (prefsResult.data?.allow_dms ?? true);
+
+        console.log(`🔒 [DM Threads] DM preference check for user ${otherUserId}: ${allowsDMs}`);
 
         if (!allowsDMs) {
+          console.log(`⛔ [DM Threads] User ${otherUserId} has DMs disabled for event ${eventId}`);
           return res.status(403).json({
             error: 'This user has disabled direct messages for this event',
             allowsDMs: false
@@ -191,6 +205,7 @@ export default async function handler(
 
         if (existingThread) {
           // Thread already exists, return it
+          console.log(`✅ [DM Threads] Found existing thread ${existingThread.id}`);
           return res.status(200).json({
             thread: {
               id: existingThread.id,
@@ -210,6 +225,7 @@ export default async function handler(
         }
 
         // Create new thread
+        console.log(`🆕 [DM Threads] Creating new thread between ${participant1Id} and ${participant2Id}`);
         const { data: newThread, error } = await supabase
           .from('event_dm_threads')
           .insert({
@@ -228,9 +244,11 @@ export default async function handler(
           .single();
 
         if (error) {
-          console.error('Error creating DM thread:', error);
-          return res.status(500).json({ error: 'Failed to create DM thread' });
+          console.error('❌ [DM Threads] Error creating DM thread:', error);
+          return res.status(500).json({ error: 'Failed to create DM thread', details: error.message });
         }
+
+        console.log(`✅ [DM Threads] Created new thread ${newThread.id}`);
 
         return res.status(201).json({
           thread: {
