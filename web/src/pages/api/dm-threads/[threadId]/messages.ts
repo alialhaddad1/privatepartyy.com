@@ -4,15 +4,38 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+// Create clients for both schemas
+const supabasePublic = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+const supabaseApi = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
   },
   db: {
-    schema: process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
+    schema: 'api'
   }
 });
+
+// Helper function to try both schemas
+async function tryBothSchemas<T>(
+  operation: (client: any) => Promise<{ data: T | null; error: any }>
+): Promise<{ data: T | null; error: any; schema?: string }> {
+  // Try api schema first
+  let result = await operation(supabaseApi);
+  if (result.data && !result.error) {
+    return { ...result, schema: 'api' };
+  }
+
+  // Try public schema
+  result = await operation(supabasePublic);
+  return { ...result, schema: 'public' };
+}
 
 const MESSAGE_LIMIT = 10;
 
@@ -43,21 +66,32 @@ export default async function handler(
 
         console.log(`📥 [DM Messages API] Fetching messages for user ${userId}`);
 
-        // Verify user is participant in this thread
-        const { data: thread, error: threadError } = await supabase
-          .from('event_dm_threads')
-          .select('*')
-          .eq('id', threadId)
-          .single();
+        // Verify user is participant in this thread - try both schemas
+        const threadResult = await tryBothSchemas<any>((client) =>
+          client
+            .from('event_dm_threads')
+            .select('*')
+            .eq('id', threadId)
+            .single()
+        );
+
+        const { data: thread, error: threadError } = threadResult;
 
         if (threadError || !thread) {
+          console.error('❌ [DM Messages API] Thread not found:', threadError);
           return res.status(404).json({ error: 'Thread not found' });
         }
 
+        console.log(`✅ [DM Messages API] Found thread in ${threadResult.schema} schema`);
+
         // Check if user is a participant
         if (thread.participant1_id !== userId && thread.participant2_id !== userId) {
+          console.error(`❌ [DM Messages API] User ${userId} is not a participant. Thread has ${thread.participant1_id} and ${thread.participant2_id}`);
           return res.status(403).json({ error: 'You are not a participant in this thread' });
         }
+
+        // Determine which client to use based on where thread was found
+        const supabase = threadResult.schema === 'api' ? supabaseApi : supabasePublic;
 
         // Fetch messages
         const { data: messages, error } = await supabase
@@ -67,9 +101,11 @@ export default async function handler(
           .order('created_at', { ascending: true });
 
         if (error) {
-          console.error('Error fetching messages:', error);
+          console.error('❌ [DM Messages API] Error fetching messages:', error);
           return res.status(500).json({ error: 'Failed to fetch messages' });
         }
+
+        console.log(`✅ [DM Messages API] Found ${messages?.length || 0} messages`);
 
         // Transform to camelCase
         const transformedMessages = (messages || []).map(msg => ({
@@ -115,12 +151,16 @@ export default async function handler(
           return res.status(400).json({ error: 'Message is too long (max 1000 characters)' });
         }
 
-        // Verify thread exists and user is a participant
-        const { data: thread, error: threadError } = await supabase
-          .from('event_dm_threads')
-          .select('*')
-          .eq('id', threadId)
-          .single();
+        // Verify thread exists and user is a participant - try both schemas
+        const threadResult = await tryBothSchemas<any>((client) =>
+          client
+            .from('event_dm_threads')
+            .select('*')
+            .eq('id', threadId)
+            .single()
+        );
+
+        const { data: thread, error: threadError } = threadResult;
 
         if (threadError || !thread) {
           return res.status(404).json({ error: 'Thread not found' });
@@ -140,6 +180,9 @@ export default async function handler(
             count: thread.message_count
           });
         }
+
+        // Determine which client to use based on where thread was found
+        const supabase = threadResult.schema === 'api' ? supabaseApi : supabasePublic;
 
         // Create message
         const { data: newMessage, error } = await supabase

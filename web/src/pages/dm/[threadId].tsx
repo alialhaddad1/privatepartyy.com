@@ -58,9 +58,19 @@ const DMPage: React.FC<DMPageProps> = ({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedProfile = localStorage.getItem('userProfile');
+      console.log('🔍 [DM Page] Raw localStorage userProfile:', storedProfile);
+
       if (storedProfile) {
         try {
           const profile = JSON.parse(storedProfile);
+          console.log('👤 [DM Page] Parsed user profile:', profile);
+
+          if (!profile.id || profile.id.length < 10) {
+            console.error('❌ [DM Page] Invalid user ID in profile:', profile.id);
+            setError('Invalid user profile. Please refresh or rejoin the event.');
+            return;
+          }
+
           setLocalUser({
             id: profile.id,
             name: profile.name,
@@ -68,8 +78,12 @@ const DMPage: React.FC<DMPageProps> = ({
             isSubscribed: false,
           });
         } catch (err) {
-          console.error('Error parsing user profile:', err);
+          console.error('❌ [DM Page] Error parsing user profile:', err);
+          setError('Could not load user profile');
         }
+      } else {
+        console.warn('⚠️ [DM Page] No user profile in localStorage');
+        setError('No user profile found. Please rejoin the event.');
       }
     }
   }, []);
@@ -180,62 +194,36 @@ const DMPage: React.FC<DMPageProps> = ({
 
   // Set up polling for new messages
   useEffect(() => {
-    const startPolling = () => {
-      const interval = setInterval(() => {
-        fetchMessages();
-      }, 3000); // Poll every 3 seconds
-
-      setPollingInterval(interval);
-    };
-
-    // Initial fetch
-    if (messages.length === 0) {
-      fetchMessages();
+    // Don't start polling if no user
+    if (!currentUser || !threadId) {
+      return;
     }
 
+    // Initial fetch
+    fetchMessages();
+
     // Start polling
-    startPolling();
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 3000); // Poll every 3 seconds
 
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [fetchMessages, messages.length, pollingInterval]);
+    setPollingInterval(interval);
 
-  // Clean up polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [pollingInterval]);
-
-  // Handle visibility change to pause/resume polling
-  useEffect(() => {
+    // Handle visibility change to pause/resume polling
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
-        }
-      } else {
-        if (!pollingInterval) {
-          const interval = setInterval(() => {
-            fetchMessages();
-          }, 3000);
-          setPollingInterval(interval);
-        }
+      if (document.hidden && pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [pollingInterval, fetchMessages]);
+  }, [currentUser, threadId]);
 
   if (!thread || !otherParticipant) {
     return (

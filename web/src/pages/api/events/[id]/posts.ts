@@ -100,6 +100,7 @@ export default async function handler(
 
         // Fetch all posts for this event from BOTH schemas
         // Posts might be in a different schema than the event itself
+        console.log(`🔍 [Posts API] Querying BOTH schemas for posts...`);
         const { data: apiPosts } = await supabaseApi
           .from('event_posts')
           .select('*')
