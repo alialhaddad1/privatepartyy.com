@@ -87,8 +87,14 @@ const DMPage: React.FC<DMPageProps> = ({
   const otherParticipant = localThread.participants.find(p => p.id !== currentUser.id);
 
   const fetchMessages = useCallback(async () => {
+    if (!currentUser || !threadId) {
+      console.warn('Cannot fetch messages: missing currentUser or threadId');
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/dm-threads/${threadId}/messages`, {
+      console.log(`📥 [DM Page] Fetching messages for thread ${threadId}, user ${currentUser.id}`);
+      const response = await fetch(`/api/dm-threads/${threadId}/messages?userId=${encodeURIComponent(currentUser.id)}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -114,7 +120,7 @@ const DMPage: React.FC<DMPageProps> = ({
       console.error('Error fetching messages:', err);
       setError('Failed to load messages');
     }
-  }, [threadId, token, router]);
+  }, [threadId, token, router, currentUser]);
 
   const sendMessage = async (content: string, type: 'text' | 'image' = 'text') => {
     if (!content.trim()) return;
@@ -141,6 +147,9 @@ const DMPage: React.FC<DMPageProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          senderId: currentUser.id,
+          senderName: currentUser.name,
+          senderAvatar: currentUser.avatar,
           content,
           type,
         }),

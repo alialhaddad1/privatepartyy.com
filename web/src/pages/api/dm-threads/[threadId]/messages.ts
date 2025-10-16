@@ -24,8 +24,11 @@ export default async function handler(
   const { method } = req;
 
   if (!threadId || typeof threadId !== 'string') {
-    return res.status(400).json({ error: 'Thread ID is required' });
+    console.error('❌ [DM Messages API] Invalid thread ID:', threadId);
+    return res.status(400).json({ error: 'Thread ID is required', received: threadId });
   }
+
+  console.log(`💬 [DM Messages API] ${method} request for thread ${threadId}`);
 
   try {
     switch (method) {
@@ -34,8 +37,11 @@ export default async function handler(
         const { userId } = req.query;
 
         if (!userId || typeof userId !== 'string') {
-          return res.status(400).json({ error: 'User ID is required' });
+          console.error('❌ [DM Messages API] Missing userId in query:', req.query);
+          return res.status(400).json({ error: 'User ID is required', received: userId });
         }
+
+        console.log(`📥 [DM Messages API] Fetching messages for user ${userId}`);
 
         // Verify user is participant in this thread
         const { data: thread, error: threadError } = await supabase
