@@ -120,6 +120,17 @@ export default async function handler(
 
         return res.status(200).json({
           messages: transformedMessages,
+          thread: {
+            id: thread.id,
+            participant1Id: thread.participant1_id,
+            participant1Name: thread.participant1_name,
+            participant1Avatar: thread.participant1_avatar,
+            participant2Id: thread.participant2_id,
+            participant2Name: thread.participant2_name,
+            participant2Avatar: thread.participant2_avatar,
+            createdAt: thread.created_at,
+            updatedAt: thread.updated_at
+          },
           messageCount: thread.message_count,
           limit: MESSAGE_LIMIT,
           remaining: Math.max(0, MESSAGE_LIMIT - thread.message_count)

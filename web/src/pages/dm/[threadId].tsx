@@ -134,6 +134,29 @@ const DMPage: React.FC<DMPageProps> = ({
 
       const data = await response.json();
       setMessages(data.messages || []);
+
+      // Update thread data from API response
+      if (data.thread) {
+        console.log('✅ [DM Page] Updating thread data from API:', data.thread);
+        setLocalThread({
+          id: data.thread.id,
+          participants: [
+            {
+              id: data.thread.participant1Id,
+              name: data.thread.participant1Name,
+              avatar: data.thread.participant1Avatar
+            },
+            {
+              id: data.thread.participant2Id,
+              name: data.thread.participant2Name,
+              avatar: data.thread.participant2Avatar
+            }
+          ],
+          createdAt: data.thread.createdAt,
+          updatedAt: data.thread.updatedAt
+        });
+      }
+
       setError('');
     } catch (err) {
       console.error('Error fetching messages:', err);
@@ -370,10 +393,10 @@ const DMPage: React.FC<DMPageProps> = ({
         .dm-page {
           display: flex;
           flex-direction: column;
-          height: 100vh;
+          min-height: 100vh;
           max-width: 800px;
           margin: 0 auto;
-          background-color: #fff;
+          background-color: #f9fafb;
         }
 
         .dm-header {
@@ -445,6 +468,114 @@ const DMPage: React.FC<DMPageProps> = ({
           background-color: #ffffff;
         }
 
+        .messages-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .message {
+          display: flex;
+          max-width: 70%;
+        }
+
+        .own-message {
+          align-self: flex-end;
+        }
+
+        .own-message .message-content {
+          background-color: #3b82f6;
+          color: white;
+          border-radius: 16px 16px 4px 16px;
+        }
+
+        .other-message {
+          align-self: flex-start;
+        }
+
+        .other-message .message-content {
+          background-color: #f3f4f6;
+          color: #111827;
+          border-radius: 16px 16px 16px 4px;
+        }
+
+        .message-content {
+          padding: 12px 16px;
+          box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .message-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 4px;
+          gap: 12px;
+        }
+
+        .sender-name {
+          font-size: 12px;
+          font-weight: 600;
+          opacity: 0.8;
+        }
+
+        .message-time {
+          font-size: 11px;
+          opacity: 0.6;
+        }
+
+        .message-text {
+          font-size: 14px;
+          line-height: 1.5;
+          word-wrap: break-word;
+        }
+
+        .empty-messages {
+          text-align: center;
+          padding: 60px 20px;
+          color: #6b7280;
+        }
+
+        .message-input {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .message-text-input {
+          flex: 1;
+          padding: 12px 16px;
+          border: 1px solid #e5e7eb;
+          border-radius: 24px;
+          font-size: 14px;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .message-text-input:focus {
+          border-color: #3b82f6;
+        }
+
+        .send-button {
+          padding: 12px 24px;
+          background-color: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 24px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: background-color 0.2s;
+        }
+
+        .send-button:hover:not(:disabled) {
+          background-color: #2563eb;
+        }
+
+        .send-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
         .message-input-container {
           border-top: 1px solid #e1e8ed;
           padding: 20px;
@@ -484,14 +615,51 @@ const DMPage: React.FC<DMPageProps> = ({
         .dm-page.loading {
           justify-content: center;
           align-items: center;
+          background-color: #f9fafb;
         }
 
         .error-message,
         .loading-message {
           text-align: center;
-          color: #657786;
-          font-size: 16px;
+          max-width: 400px;
           padding: 40px;
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+
+        .error-message {
+          color: #991b1b;
+          border: 1px solid #fecaca;
+        }
+
+        .loading-message {
+          color: #1e40af;
+          border: 1px solid #dbeafe;
+        }
+
+        .error-message::before {
+          content: '⚠️';
+          display: block;
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+
+        .loading-message::before {
+          content: '⏳';
+          display: block;
+          font-size: 48px;
+          margin-bottom: 16px;
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
         }
 
         @media (max-width: 768px) {
