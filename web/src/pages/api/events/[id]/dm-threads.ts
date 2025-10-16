@@ -168,12 +168,18 @@ export default async function handler(
             .single()
         );
 
-        // Default to true if no preference found (PGRST116 means no rows)
-        const allowsDMs = prefsResult.error?.code === 'PGRST116'
-          ? true
-          : (prefsResult.data?.allow_dms ?? true);
+        // Default to true if no preference found OR if there's an error
+        let allowsDMs = true;
+        if (!prefsResult.error && prefsResult.data) {
+          // Only if we successfully found a preference, use its value
+          allowsDMs = prefsResult.data.allow_dms ?? true;
+        }
 
-        console.log(`🔒 [DM Threads] DM preference check for user ${otherUserId}: ${allowsDMs}`);
+        console.log(`🔒 [DM Threads] DM preference check for user ${otherUserId}:`, {
+          foundPreference: !prefsResult.error && !!prefsResult.data,
+          allowsDMs,
+          error: prefsResult.error?.code
+        });
 
         if (!allowsDMs) {
           console.log(`⛔ [DM Threads] User ${otherUserId} has DMs disabled for event ${eventId}`);

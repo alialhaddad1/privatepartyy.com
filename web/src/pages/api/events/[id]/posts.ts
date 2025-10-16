@@ -98,67 +98,90 @@ export default async function handler(
 
         const hostId = event?.host_id;
 
-        // Fetch all posts for this event
-        const { data: posts, error } = await supabase
+        // Fetch all posts for this event from BOTH schemas
+        // Posts might be in a different schema than the event itself
+        const { data: apiPosts } = await supabaseApi
           .from('event_posts')
           .select('*')
           .eq('event_id', eventId)
           .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('❌ [Posts API] Error fetching posts:', error);
-          return res.status(500).json({ error: 'Failed to fetch posts' });
-        }
+        const { data: publicPosts } = await supabasePublic
+          .from('event_posts')
+          .select('*')
+          .eq('event_id', eventId)
+          .order('created_at', { ascending: false });
 
-        console.log(`✅ [Posts API] Found ${posts?.length || 0} posts for event ${eventId}`);
-        if (posts && posts.length > 0) {
+        // Combine posts from both schemas and remove duplicates
+        const allPosts = [...(apiPosts || []), ...(publicPosts || [])];
+        const uniquePostsMap = new Map();
+        allPosts.forEach(post => {
+          uniquePostsMap.set(post.id, post);
+        });
+        const posts = Array.from(uniquePostsMap.values())
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        console.log(`✅ [Posts API] Found ${posts.length} posts for event ${eventId} (${apiPosts?.length || 0} from api, ${publicPosts?.length || 0} from public)`);
+        if (posts.length > 0) {
           console.log(`📋 [Posts API] Post IDs: ${posts.map((p: any) => p.id).join(', ')}`);
         }
 
-        // Fetch media items for multi-media posts
+        // Fetch media items for multi-media posts from BOTH schemas
         const postIds = (posts || []).map((post: any) => post.id);
         let mediaItemsMap: { [key: string]: any[] } = {};
         let userLikesMap: { [key: string]: boolean } = {};
 
         if (postIds.length > 0) {
-          const { data: mediaItems, error: mediaError } = await supabase
+          // Fetch media from both schemas
+          const { data: apiMedia } = await supabaseApi
             .from('event_post_media')
             .select('*')
             .in('post_id', postIds)
             .order('display_order', { ascending: true });
 
-          if (!mediaError && mediaItems) {
-            mediaItemsMap = mediaItems.reduce((acc: { [key: string]: any[] }, item: any) => {
-              if (!acc[item.post_id]) {
-                acc[item.post_id] = [];
-              }
-              acc[item.post_id].push({
-                id: item.id,
-                mediaType: item.media_type,
-                mediaUrl: item.media_url,
-                fileKey: item.file_key,
-                thumbnailUrl: item.thumbnail_url,
-                originalFilename: item.original_filename,
-                displayOrder: item.display_order
-              });
-              return acc;
-            }, {} as { [key: string]: any[] });
-          }
+          const { data: publicMedia } = await supabasePublic
+            .from('event_post_media')
+            .select('*')
+            .in('post_id', postIds)
+            .order('display_order', { ascending: true });
 
-          // Fetch user's likes if userId is provided
+          const allMedia = [...(apiMedia || []), ...(publicMedia || [])];
+
+          mediaItemsMap = allMedia.reduce((acc: { [key: string]: any[] }, item: any) => {
+            if (!acc[item.post_id]) {
+              acc[item.post_id] = [];
+            }
+            acc[item.post_id].push({
+              id: item.id,
+              mediaType: item.media_type,
+              mediaUrl: item.media_url,
+              fileKey: item.file_key,
+              thumbnailUrl: item.thumbnail_url,
+              originalFilename: item.original_filename,
+              displayOrder: item.display_order
+            });
+            return acc;
+          }, {} as { [key: string]: any[] });
+
+          // Fetch user's likes if userId is provided from BOTH schemas
           if (userId && typeof userId === 'string') {
-            const { data: userLikes, error: likesError } = await supabase
+            const { data: apiLikes } = await supabaseApi
               .from('event_post_likes')
               .select('post_id')
               .in('post_id', postIds)
               .eq('user_id', userId);
 
-            if (!likesError && userLikes) {
-              userLikesMap = userLikes.reduce((acc: { [key: string]: boolean }, like: any) => {
-                acc[like.post_id] = true;
-                return acc;
-              }, {} as { [key: string]: boolean });
-            }
+            const { data: publicLikes } = await supabasePublic
+              .from('event_post_likes')
+              .select('post_id')
+              .in('post_id', postIds)
+              .eq('user_id', userId);
+
+            const allLikes = [...(apiLikes || []), ...(publicLikes || [])];
+            userLikesMap = allLikes.reduce((acc: { [key: string]: boolean }, like: any) => {
+              acc[like.post_id] = true;
+              return acc;
+            }, {} as { [key: string]: boolean });
           }
         }
 
