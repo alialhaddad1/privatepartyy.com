@@ -4,7 +4,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+// Create clients for both schemas
+const supabasePublic = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+const supabaseApi = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -13,6 +21,21 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
     schema: 'api'
   }
 });
+
+// Helper function to try both schemas
+async function tryBothSchemas<T>(
+  operation: (client: any) => Promise<{ data: T | null; error: any }>
+): Promise<{ data: T | null; error: any; schema?: string }> {
+  // Try api schema first
+  let result = await operation(supabaseApi);
+  if (result.data && !result.error) {
+    return { ...result, schema: 'api' };
+  }
+
+  // Try public schema
+  result = await operation(supabasePublic);
+  return { ...result, schema: 'public' };
+}
 
 interface UserProfile {
   id: string;
@@ -54,23 +77,22 @@ export default async function handler(
           });
         }
 
-        // Check if profile with this email already exists
-        const { data: existingProfile, error: fetchError } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('email', profileData.email.toLowerCase())
-          .single();
+        // Check if profile with this email already exists in both schemas
+        const profileResult = await tryBothSchemas<any>((client) =>
+          client.from('user_profiles')
+            .select('*')
+            .eq('email', profileData.email.toLowerCase())
+            .single()
+        );
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          // PGRST116 means no rows found, which is fine
-          console.error('❌ [Profile API] Error checking existing profile:', fetchError);
-        }
+        const existingProfile = profileResult.data;
+        const supabase = profileResult.schema === 'api' ? supabaseApi : supabasePublic;
 
         let result;
 
         if (existingProfile) {
-          // Update existing profile
-          console.log('✏️ [Profile API] Updating existing profile for:', profileData.email);
+          // Update existing profile in the schema where it was found
+          console.log(`✏️ [Profile API] Updating existing profile for ${profileData.email} in ${profileResult.schema} schema`);
 
           const { data, error } = await supabase
             .from('user_profiles')
@@ -95,10 +117,10 @@ export default async function handler(
 
           result = data;
         } else {
-          // Create new profile
+          // Create new profile - try api schema first, then public
           console.log('✨ [Profile API] Creating new profile for:', profileData.email);
 
-          const { data, error } = await supabase
+          const { data: apiData, error: apiError } = await supabaseApi
             .from('user_profiles')
             .insert([{
               id: profileData.id,
@@ -113,15 +135,37 @@ export default async function handler(
             .select()
             .single();
 
-          if (error) {
-            console.error('❌ [Profile API] Error creating profile:', error);
-            return res.status(500).json({
-              error: 'Failed to create profile',
-              details: error.message
-            });
-          }
+          if (!apiError && apiData) {
+            result = apiData;
+            console.log('✅ [Profile API] Profile created in api schema');
+          } else {
+            // Try public schema
+            const { data: publicData, error: publicError } = await supabasePublic
+              .from('user_profiles')
+              .insert([{
+                id: profileData.id,
+                name: profileData.name,
+                email: profileData.email.toLowerCase(),
+                avatar: profileData.avatar,
+                generation: profileData.generation,
+                is_anonymous: profileData.isAnonymous,
+                created_at: profileData.createdAt,
+                updated_at: new Date().toISOString()
+              }])
+              .select()
+              .single();
 
-          result = data;
+            if (publicError) {
+              console.error('❌ [Profile API] Error creating profile in both schemas:', { apiError, publicError });
+              return res.status(500).json({
+                error: 'Failed to create profile',
+                details: publicError.message
+              });
+            }
+
+            result = publicData;
+            console.log('✅ [Profile API] Profile created in public schema');
+          }
         }
 
         console.log('✅ [Profile API] Profile saved successfully:', result.id);
@@ -153,27 +197,30 @@ export default async function handler(
 
         console.log('🔍 [Profile API] Fetching profile for:', email);
 
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('email', email.toLowerCase())
-          .single();
+        // Try both schemas
+        const profileResult = await tryBothSchemas<any>((client) =>
+          client.from('user_profiles')
+            .select('*')
+            .eq('email', email.toLowerCase())
+            .single()
+        );
 
-        if (error) {
-          if (error.code === 'PGRST116') {
+        if (profileResult.error) {
+          if (profileResult.error.code === 'PGRST116') {
             return res.status(404).json({
               error: 'Profile not found'
             });
           }
 
-          console.error('❌ [Profile API] Error fetching profile:', error);
+          console.error('❌ [Profile API] Error fetching profile:', profileResult.error);
           return res.status(500).json({
             error: 'Failed to fetch profile',
-            details: error.message
+            details: profileResult.error.message
           });
         }
 
-        console.log('✅ [Profile API] Profile found:', data.id);
+        const data = profileResult.data;
+        console.log(`✅ [Profile API] Profile found in ${profileResult.schema} schema:`, data.id);
 
         return res.status(200).json({
           profile: {

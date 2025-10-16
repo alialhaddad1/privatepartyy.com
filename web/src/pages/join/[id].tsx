@@ -52,22 +52,47 @@ const JoinEventPage: React.FC = () => {
     }
   }, [queryId, queryToken]);
 
-  // Check if user is already logged in via Supabase auth
+  // Check if user is already logged in via Supabase auth or has localStorage profile
   useEffect(() => {
-    if (user && eventId && eventToken) {
-      // User is logged in, go directly to event
-      router.push(`/event/${eventId}?token=${eventToken}`);
-    }
-  }, [user, eventId, eventToken, router]);
+    const redirectToEvent = async () => {
+      if (!eventId) return; // Wait for eventId to be set
 
-  // Check if user already has a profile stored (legacy localStorage approach)
-  useEffect(() => {
-    const storedProfile = localStorage.getItem('userProfile');
-    if (storedProfile && eventId && eventToken && !user) {
-      // User already has a profile, go directly to event
-      router.push(`/event/${eventId}?token=${eventToken}`);
-    }
-  }, [eventId, eventToken, user, router]);
+      const storedProfile = localStorage.getItem('userProfile');
+      const hasAuth = !!user;
+      const hasProfile = !!storedProfile;
+
+      if (hasAuth || hasProfile) {
+        let finalToken = eventToken;
+
+        // If token is missing, fetch it from the API
+        if (!finalToken) {
+          console.log('Token missing, fetching from API for eventId:', eventId);
+          try {
+            const response = await fetch(`/api/events/${eventId}`);
+            if (response.ok) {
+              const data = await response.json();
+              finalToken = data.token;
+              setEventToken(finalToken); // Update state
+              console.log('Fetched token:', finalToken);
+            } else {
+              console.error('Failed to fetch event token, response:', response.status);
+            }
+          } catch (err) {
+            console.error('Error fetching event token:', err);
+          }
+        }
+
+        if (finalToken) {
+          console.log('Redirecting to event with token:', finalToken);
+          router.push(`/event/${eventId}?token=${finalToken}`);
+        } else {
+          console.error('Cannot redirect: token is missing after fetch attempt');
+        }
+      }
+    };
+
+    redirectToEvent();
+  }, [user, eventId, eventToken, router]);
 
   // Check if profile exists by email (for returning users)
   const checkExistingProfile = async (email: string) => {
@@ -193,14 +218,31 @@ const JoinEventPage: React.FC = () => {
 
       // Use the most reliable source - prefer state, fall back to query
       const finalEventId = eventId || queryId;
-      const finalEventToken = eventToken || queryToken;
+      let finalEventToken = eventToken || queryToken;
+
+      // If token is still missing, fetch it from the API
+      if (finalEventId && !finalEventToken) {
+        console.log('Token missing, fetching from API before redirect...');
+        try {
+          const response = await fetch(`/api/events/${finalEventId}`);
+          if (response.ok) {
+            const data = await response.json();
+            finalEventToken = data.token;
+            console.log('Fetched token for redirect:', finalEventToken);
+          } else {
+            console.error('Failed to fetch event token, response:', response.status);
+          }
+        } catch (err) {
+          console.error('Error fetching event token:', err);
+        }
+      }
 
       if (finalEventId && finalEventToken) {
         const redirectUrl = `/event/${finalEventId}?token=${finalEventToken}`;
         console.log('Redirecting to:', redirectUrl);
         window.location.href = redirectUrl;
       } else {
-        console.error('Missing params:', { eventId, eventToken, queryId, queryToken });
+        console.error('Missing params:', { eventId, eventToken, queryId, queryToken, finalEventToken });
         setError('Missing event information. Please try again.');
         setLoading(false);
       }
