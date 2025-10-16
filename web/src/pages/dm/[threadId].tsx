@@ -53,6 +53,7 @@ const DMPage: React.FC<DMPageProps> = ({
   const [messageInput, setMessageInput] = useState<string>('');
   const [localUser, setLocalUser] = useState<User | null>(null);
   const [localThread, setLocalThread] = useState<Thread>(thread);
+  const [userLoaded, setUserLoaded] = useState(false);
 
   // Load user from localStorage
   useEffect(() => {
@@ -68,6 +69,7 @@ const DMPage: React.FC<DMPageProps> = ({
           if (!profile.id || profile.id.length < 10) {
             console.error('❌ [DM Page] Invalid user ID in profile:', profile.id);
             setError('Invalid user profile. Please refresh or rejoin the event.');
+            setUserLoaded(true);
             return;
           }
 
@@ -77,13 +79,16 @@ const DMPage: React.FC<DMPageProps> = ({
             avatar: profile.avatar,
             isSubscribed: false,
           });
+          setUserLoaded(true);
         } catch (err) {
           console.error('❌ [DM Page] Error parsing user profile:', err);
           setError('Could not load user profile');
+          setUserLoaded(true);
         }
       } else {
         console.warn('⚠️ [DM Page] No user profile in localStorage');
         setError('No user profile found. Please rejoin the event.');
+        setUserLoaded(true);
       }
     }
   }, []);
@@ -194,10 +199,13 @@ const DMPage: React.FC<DMPageProps> = ({
 
   // Set up polling for new messages
   useEffect(() => {
-    // Don't start polling if no user
-    if (!currentUser || !threadId) {
+    // Wait for user to be loaded from localStorage
+    if (!userLoaded || !localUser || !threadId) {
+      console.log('⏸️ [DM Page] Waiting for user to load before polling');
       return;
     }
+
+    console.log(`▶️ [DM Page] Starting polling for user ${localUser.id}`);
 
     // Initial fetch
     fetchMessages();
@@ -223,7 +231,31 @@ const DMPage: React.FC<DMPageProps> = ({
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentUser, threadId]);
+    // Only depend on userLoaded and threadId - fetchMessages is stable via useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLoaded, localUser, threadId]);
+
+  // Show loading state while user profile loads
+  if (!userLoaded) {
+    return (
+      <div className="dm-page loading">
+        <div className="loading-message">
+          Loading your profile...
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if user didn't load properly
+  if (userLoaded && !localUser) {
+    return (
+      <div className="dm-page error">
+        <div className="error-message">
+          {error || 'Could not load your profile. Please rejoin the event.'}
+        </div>
+      </div>
+    );
+  }
 
   if (!thread || !otherParticipant) {
     return (
@@ -448,12 +480,14 @@ const DMPage: React.FC<DMPageProps> = ({
           background-color: #218838;
         }
 
-        .dm-page.error {
+        .dm-page.error,
+        .dm-page.loading {
           justify-content: center;
           align-items: center;
         }
 
-        .error-message {
+        .error-message,
+        .loading-message {
           text-align: center;
           color: #657786;
           font-size: 16px;
