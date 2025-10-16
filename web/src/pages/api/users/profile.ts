@@ -97,8 +97,8 @@ export default async function handler(
           const { data, error } = await supabase
             .from('user_profiles')
             .update({
-              name: profileData.name,
-              avatar: profileData.avatar,
+              display_name: profileData.name,
+              avatar_url: profileData.avatar,
               generation: profileData.generation,
               is_anonymous: profileData.isAnonymous,
               updated_at: new Date().toISOString()
@@ -124,9 +124,9 @@ export default async function handler(
             .from('user_profiles')
             .insert([{
               id: profileData.id,
-              name: profileData.name,
+              display_name: profileData.name,
               email: profileData.email.toLowerCase(),
-              avatar: profileData.avatar,
+              avatar_url: profileData.avatar,
               generation: profileData.generation,
               is_anonymous: profileData.isAnonymous,
               created_at: profileData.createdAt,
@@ -144,9 +144,9 @@ export default async function handler(
               .from('user_profiles')
               .insert([{
                 id: profileData.id,
-                name: profileData.name,
+                display_name: profileData.name,
                 email: profileData.email.toLowerCase(),
-                avatar: profileData.avatar,
+                avatar_url: profileData.avatar,
                 generation: profileData.generation,
                 is_anonymous: profileData.isAnonymous,
                 created_at: profileData.createdAt,
@@ -174,9 +174,9 @@ export default async function handler(
           success: true,
           profile: {
             id: result.id,
-            name: result.name,
+            name: result.display_name || result.name,
             email: result.email,
-            avatar: result.avatar,
+            avatar: result.avatar_url || result.avatar,
             generation: result.generation,
             isAnonymous: result.is_anonymous,
             createdAt: result.created_at,
@@ -225,9 +225,9 @@ export default async function handler(
         return res.status(200).json({
           profile: {
             id: data.id,
-            name: data.name,
+            name: data.display_name || data.name,
             email: data.email,
-            avatar: data.avatar,
+            avatar: data.avatar_url || data.avatar,
             generation: data.generation,
             isAnonymous: data.is_anonymous,
             createdAt: data.created_at,

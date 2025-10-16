@@ -207,41 +207,69 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   }, [id, token, router]);
 
   const handleLike = async (postId: string) => {
+    if (!user) {
+      setError('You must be logged in to like posts');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
     try {
+      const post = posts.find(p => p.id === postId);
+      const wasLiked = post?.isLiked;
+
       // Optimistically update UI
-      setPosts(prev => prev.map(post => {
-        if (post.id === postId) {
+      setPosts(prev => prev.map(p => {
+        if (p.id === postId) {
           return {
-            ...post,
-            isLiked: !post.isLiked,
-            likes: post.isLiked ? post.likes - 1 : post.likes + 1
+            ...p,
+            isLiked: !p.isLiked,
+            likes: p.isLiked ? p.likes - 1 : p.likes + 1
           };
         }
-        return post;
+        return p;
       }));
 
-      const response = await fetch(`/api/posts/${postId}/like`, {
-        method: 'POST',
+      const response = await fetch(`/api/posts/${postId}/likes`, {
+        method: wasLiked ? 'DELETE' : 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          userId: user.id,
+          userName: user.name,
+          userAvatar: user.avatar || '👤'
+        }),
       });
 
       if (!response.ok) {
         // Revert optimistic update
-        setPosts(prev => prev.map(post => {
-          if (post.id === postId) {
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
             return {
-              ...post,
-              isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes + 1 : post.likes - 1
+              ...p,
+              isLiked: wasLiked,
+              likes: wasLiked ? p.likes + 1 : p.likes - 1
             };
           }
-          return post;
+          return p;
         }));
+
+        if (response.status === 409) {
+          // Already liked - just update UI to reflect that
+          setPosts(prev => prev.map(p => {
+            if (p.id === postId) {
+              return { ...p, isLiked: true };
+            }
+            return p;
+          }));
+          return;
+        }
+
         throw new Error('Failed to like post');
       }
+
+      console.log(`✅ Post ${postId} ${wasLiked ? 'unliked' : 'liked'}`);
     } catch (err) {
       console.error('Error liking post:', err);
       setError('Failed to like post');
@@ -250,9 +278,10 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   };
 
   const handleComment = async (postId: string) => {
-    // Navigate to post detail or open comment modal
-    // For now, we'll just show an alert
-    alert('Comment functionality would open a modal or navigate to post detail');
+    // TODO: Implement comment functionality
+    // This will eventually open a modal or navigate to post detail
+    // For now, disable the button by not doing anything
+    console.log('Comment clicked for post:', postId);
   };
 
   const handleDM = async (userId: string) => {
@@ -552,6 +581,8 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                     <button
                       onClick={() => handleComment(post.id)}
                       className="action-button comment-button"
+                      disabled
+                      title="Comments coming soon"
                     >
                       💬 {post.comments}
                     </button>
