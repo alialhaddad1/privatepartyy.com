@@ -245,22 +245,44 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 
   const handleDM = async (userId: string) => {
     try {
+      if (!user) {
+        setError('You must be logged in to send messages');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
+      // Find the post author's info
+      const post = posts.find(p => p.authorId === userId);
+      if (!post) {
+        setError('Could not find user information');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
       // Create or find existing DM thread
-      const response = await fetch('/api/dms/threads', {
+      const response = await fetch(`/api/events/${id}/dm-threads`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ participantId: userId }),
+        body: JSON.stringify({
+          currentUserId: user.id,
+          currentUserName: user.name,
+          currentUserAvatar: user.avatar || '👤',
+          otherUserId: post.authorId,
+          otherUserName: post.authorName,
+          otherUserAvatar: post.authorAvatar || '👤'
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create DM thread');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create DM thread');
       }
 
-      const { threadId } = await response.json();
-      router.push(`/dm/${threadId}`);
+      const { thread } = await response.json();
+      router.push(`/dm/${thread.id}`);
     } catch (err) {
       console.error('Error creating DM:', err);
       setError('Failed to start conversation');

@@ -4,15 +4,38 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+// Create clients for both schemas
+const supabasePublic = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+const supabaseApi = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
   },
   db: {
-    schema: process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
+    schema: 'api'
   }
 });
+
+// Helper function to try both schemas
+async function tryBothSchemas<T>(
+  operation: (client: any) => Promise<{ data: T | null; error: any }>
+): Promise<{ data: T | null; error: any; schema?: string }> {
+  // Try api schema first
+  let result = await operation(supabaseApi);
+  if (result.data && !result.error) {
+    return { ...result, schema: 'api' };
+  }
+
+  // Try public schema
+  result = await operation(supabasePublic);
+  return { ...result, schema: 'public' };
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,34 +50,43 @@ export default async function handler(
 
   try {
     // Helper function to resolve event ID from token or UUID
-    const resolveEventId = async (eventIdOrToken: string): Promise<string | null> => {
+    const resolveEventId = async (eventIdOrToken: string): Promise<{ id: string; schema: string } | null> => {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
       if (uuidRegex.test(eventIdOrToken)) {
-        // It's a UUID, use directly
-        return eventIdOrToken;
-      } else {
-        // It's a token, look up the event
-        const { data: eventByToken, error: tokenError } = await supabase
-          .from('events')
-          .select('id')
-          .eq('token', eventIdOrToken)
-          .single();
+        // It's a UUID, check which schema has it
+        const eventResult = await tryBothSchemas<{ id: string }>((client) =>
+          client.from('events').select('id').eq('id', eventIdOrToken).single()
+        );
 
-        if (tokenError || !eventByToken) {
-          console.error('Error fetching event:', tokenError);
+        if (eventResult.error || !eventResult.data) {
           return null;
         }
 
-        return eventByToken.id;
+        return { id: eventIdOrToken, schema: eventResult.schema || 'public' };
+      } else {
+        // It's a token, look up the event in both schemas
+        const eventResult = await tryBothSchemas<{ id: string }>((client) =>
+          client.from('events').select('id').eq('token', eventIdOrToken).single()
+        );
+
+        if (eventResult.error || !eventResult.data) {
+          console.error('Error fetching event:', eventResult.error);
+          return null;
+        }
+
+        return { id: eventResult.data.id, schema: eventResult.schema || 'public' };
       }
     };
 
     // Resolve the event ID
-    const eventId = await resolveEventId(eventIdOrToken);
-    if (!eventId) {
+    const eventResult = await resolveEventId(eventIdOrToken);
+    if (!eventResult) {
       return res.status(404).json({ error: 'Event not found' });
     }
+
+    const eventId = eventResult.id;
+    const supabase = eventResult.schema === 'api' ? supabaseApi : supabasePublic;
 
     switch (method) {
       case 'GET': {
