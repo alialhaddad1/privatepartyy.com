@@ -7,7 +7,9 @@
       "Bash(cron)",
       "Bash(delete)",
       "Bash(schedule\" || echo \"Listing API directory\" && ls \"C:UsersalialPrivatePartyy.comwebsrcpagesapi\"\")",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(cat:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []
