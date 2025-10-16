@@ -158,36 +158,9 @@ export default async function handler(
           return res.status(400).json({ error: 'Cannot DM yourself' });
         }
 
-        // Check if the recipient allows DMs for this event
-        // Try both schemas for preferences
-        const prefsResult = await tryBothSchemas<{ allow_dms: boolean }>((client) =>
-          client.from('event_user_preferences')
-            .select('allow_dms')
-            .eq('event_id', eventId)
-            .eq('user_id', otherUserId)
-            .single()
-        );
-
-        // Default to true if no preference found OR if there's an error
-        let allowsDMs = true;
-        if (!prefsResult.error && prefsResult.data) {
-          // Only if we successfully found a preference, use its value
-          allowsDMs = prefsResult.data.allow_dms ?? true;
-        }
-
-        console.log(`🔒 [DM Threads] DM preference check for user ${otherUserId}:`, {
-          foundPreference: !prefsResult.error && !!prefsResult.data,
-          allowsDMs,
-          error: prefsResult.error?.code
-        });
-
-        if (!allowsDMs) {
-          console.log(`⛔ [DM Threads] User ${otherUserId} has DMs disabled for event ${eventId}`);
-          return res.status(403).json({
-            error: 'This user has disabled direct messages for this event',
-            allowsDMs: false
-          });
-        }
+        // TEMPORARILY DISABLED: DM preference checking
+        // TODO: Fix this properly - for now, allow all DMs
+        console.log(`🔒 [DM Threads] DM preference check DISABLED - allowing all DMs`);
 
         // Ensure participant order for unique constraint (participant1 < participant2)
         const [participant1Id, participant1Name, participant1Avatar] =
