@@ -6,9 +6,20 @@ import Header from '../../components/Header';
 import Feed from '../../components/Feed';
 import UploadWidget from '../../components/UploadWidget';
 
+interface MediaItem {
+  id: string;
+  mediaType: string;
+  mediaUrl: string;
+  fileKey: string;
+  thumbnailUrl?: string;
+  originalFilename: string;
+  displayOrder: number;
+}
+
 interface Post {
   id: string;
   content?: string;
+  caption?: string;
   imageUrl?: string;
   authorId: string;
   authorName: string;
@@ -17,7 +28,8 @@ interface Post {
   comments: number;
   isLiked: boolean;
   createdAt: string;
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'media';
+  mediaItems?: MediaItem[];
 }
 
 interface EventData {
@@ -471,13 +483,27 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                     {post.content && (
                       <p className="post-text">{post.content}</p>
                     )}
-                    {post.imageUrl && (
-                      <img 
-                        src={post.imageUrl} 
+                    {post.caption && (
+                      <p className="post-caption">{post.caption}</p>
+                    )}
+                    {post.type === 'media' && post.mediaItems && post.mediaItems.length > 0 ? (
+                      <div className="media-grid">
+                        {post.mediaItems.map((media) => (
+                          <img
+                            key={media.id}
+                            src={media.mediaUrl}
+                            alt={media.originalFilename || "Post media"}
+                            className="post-media-item"
+                          />
+                        ))}
+                      </div>
+                    ) : post.imageUrl ? (
+                      <img
+                        src={post.imageUrl}
                         alt="Post content"
                         className="post-image"
                       />
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="post-actions">
@@ -846,11 +872,45 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
           margin: 0 0 12px 0;
         }
 
+        .post-caption {
+          font-size: 15px;
+          color: #1a1a1a;
+          line-height: 1.5;
+          margin: 0 0 12px 0;
+          font-style: italic;
+        }
+
         .post-image {
           width: 100%;
           border-radius: 12px;
           max-height: 500px;
           object-fit: cover;
+        }
+
+        .media-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .post-media-item {
+          width: 100%;
+          border-radius: 12px;
+          object-fit: cover;
+          aspect-ratio: 1;
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+
+        .post-media-item:hover {
+          transform: scale(1.02);
+        }
+
+        @media (max-width: 768px) {
+          .media-grid {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          }
         }
 
         .post-actions {
