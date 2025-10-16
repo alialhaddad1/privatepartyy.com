@@ -82,6 +82,8 @@ export default async function handler(
         // Get optional userId from query to check like status
         const { userId } = req.query;
 
+        console.log(`📬 [Posts API] Fetching posts for event ${eventId} using ${supabase === supabaseApi ? 'api' : 'public'} schema`);
+
         // Fetch event to get host_id
         const { data: event, error: eventError } = await supabase
           .from('events')
@@ -90,7 +92,7 @@ export default async function handler(
           .single();
 
         if (eventError) {
-          console.error('Error fetching event:', eventError);
+          console.error('❌ [Posts API] Error fetching event:', eventError);
           return res.status(500).json({ error: 'Failed to fetch event' });
         }
 
@@ -104,8 +106,13 @@ export default async function handler(
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.error('Error fetching posts:', error);
+          console.error('❌ [Posts API] Error fetching posts:', error);
           return res.status(500).json({ error: 'Failed to fetch posts' });
+        }
+
+        console.log(`✅ [Posts API] Found ${posts?.length || 0} posts for event ${eventId}`);
+        if (posts && posts.length > 0) {
+          console.log(`📋 [Posts API] Post IDs: ${posts.map((p: any) => p.id).join(', ')}`);
         }
 
         // Fetch media items for multi-media posts
@@ -186,6 +193,8 @@ export default async function handler(
             updatedAt: post.updated_at
           };
         });
+
+        console.log(`🎉 [Posts API] Returning ${transformedPosts.length} transformed posts`);
 
         return res.status(200).json({ posts: transformedPosts });
       }

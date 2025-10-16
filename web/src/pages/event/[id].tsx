@@ -67,6 +67,12 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 }) => {
   const router = useRouter();
   const { id } = router.query;
+
+  console.log(`🎬 [Event Page] Initializing with ${initialPosts.length} initial posts`);
+  if (initialPosts.length > 0) {
+    console.log(`📋 [Event Page] Initial post IDs: ${initialPosts.map(p => p.id).join(', ')}`);
+  }
+
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -183,6 +189,10 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
       }
 
       const data = await response.json();
+      console.log(`📥 [Event Page] Received ${data.posts?.length || 0} posts from API`);
+      if (data.posts && data.posts.length > 0) {
+        console.log(`📋 [Event Page] Post IDs: ${data.posts.map((p: Post) => p.id).join(', ')}`);
+      }
       setPosts(data.posts || []);
       setError('');
     } catch (err) {
