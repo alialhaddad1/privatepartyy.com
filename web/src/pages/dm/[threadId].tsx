@@ -54,6 +54,9 @@ const DMPage: React.FC<DMPageProps> = ({
   const [localUser, setLocalUser] = useState<User | null>(null);
   const [localThread, setLocalThread] = useState<Thread>(thread);
   const [userLoaded, setUserLoaded] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [messageLimit, setMessageLimit] = useState(10);
+  const [remaining, setRemaining] = useState(10);
 
   // Load user from localStorage
   useEffect(() => {
@@ -135,6 +138,17 @@ const DMPage: React.FC<DMPageProps> = ({
       const data = await response.json();
       setMessages(data.messages || []);
 
+      // Update message count and limit from API
+      if (typeof data.messageCount === 'number') {
+        setMessageCount(data.messageCount);
+      }
+      if (typeof data.limit === 'number') {
+        setMessageLimit(data.limit);
+      }
+      if (typeof data.remaining === 'number') {
+        setRemaining(data.remaining);
+      }
+
       // Update thread data from API response
       if (data.thread) {
         console.log('✅ [DM Page] Updating thread data from API:', data.thread);
@@ -167,6 +181,13 @@ const DMPage: React.FC<DMPageProps> = ({
   const sendMessage = async (content: string, type: 'text' | 'image' = 'text') => {
     if (!content.trim()) return;
 
+    // Check if limit reached
+    if (messageCount >= messageLimit) {
+      setError(`You've reached the ${messageLimit} message limit. Exchange contact info to continue chatting!`);
+      setTimeout(() => setError(''), 5000);
+      return;
+    }
+
     const tempId = `temp-${Date.now()}`;
     const tempMessage: Message = {
       id: tempId,
@@ -198,22 +219,38 @@ const DMPage: React.FC<DMPageProps> = ({
       });
 
       if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 429) {
+          // Message limit reached
+          setError(errorData.message || 'Message limit reached');
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
+          setTimeout(() => setError(''), 5000);
+          return;
+        }
         throw new Error('Failed to send message');
       }
 
-      const sentMessage = await response.json();
-      
+      const data = await response.json();
+
+      // Update counts from response
+      if (typeof data.messageCount === 'number') {
+        setMessageCount(data.messageCount);
+      }
+      if (typeof data.remaining === 'number') {
+        setRemaining(data.remaining);
+      }
+
       // Replace temp message with real message
-      setMessages(prev => 
-        prev.map(msg => msg.id === tempId ? sentMessage : msg)
+      setMessages(prev =>
+        prev.map(msg => msg.id === tempId ? data.message : msg)
       );
 
     } catch (err) {
       console.error('Error sending message:', err);
-      
+
       // Remove temp message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
-      
+
       // Show error
       setError('Failed to send message. Please try again.');
       setTimeout(() => setError(''), 5000);
@@ -294,22 +331,36 @@ const DMPage: React.FC<DMPageProps> = ({
     <div className="dm-page">
       <div className="dm-header">
         <div className="participant-info">
-          {otherParticipant.avatar && (
-            <img 
-              src={otherParticipant.avatar} 
+          {otherParticipant.avatar && otherParticipant.avatar.startsWith('http') ? (
+            <img
+              src={otherParticipant.avatar}
               alt={otherParticipant.name}
               className="participant-avatar"
+              onError={(e) => {
+                // Fallback to emoji if image fails to load
+                e.currentTarget.style.display = 'none';
+              }}
             />
+          ) : (
+            <div className="participant-avatar-emoji">
+              {otherParticipant.avatar || '👤'}
+            </div>
           )}
           <div className="participant-details">
             <h2 className="participant-name">{otherParticipant.name}</h2>
             <span className="conversation-status">
-              {messages.length} messages
+              {messageCount}/{messageLimit} messages used
+              {remaining > 0 && (
+                <span className="remaining-count"> • {remaining} remaining</span>
+              )}
+              {remaining === 0 && (
+                <span className="limit-reached"> • Limit reached!</span>
+              )}
             </span>
           </div>
         </div>
-        
-        <button 
+
+        <button
           onClick={() => router.back()}
           className="back-button"
         >
@@ -357,14 +408,14 @@ const DMPage: React.FC<DMPageProps> = ({
       </div>
 
       <div className="message-input-container">
-        {currentUser.isSubscribed ? (
+        {remaining > 0 ? (
           <div className="message-input">
             <input
               type="text"
               placeholder={`Message ${otherParticipant.name}...`}
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               disabled={loading}
               className="message-text-input"
             />
@@ -377,14 +428,9 @@ const DMPage: React.FC<DMPageProps> = ({
             </button>
           </div>
         ) : (
-          <div className="subscription-gate">
-            <p>Subscribe to PrivatePartyy to send direct messages</p>
-            <button 
-              onClick={() => router.push('/subscribe')}
-              className="subscribe-button"
-            >
-              Subscribe Now
-            </button>
+          <div className="message-limit-reached">
+            <p>💬 You've reached the {messageLimit} message limit for this conversation.</p>
+            <p className="limit-hint">Exchange contact info to continue chatting outside the app!</p>
           </div>
         )}
       </div>
@@ -421,6 +467,17 @@ const DMPage: React.FC<DMPageProps> = ({
           object-fit: cover;
         }
 
+        .participant-avatar-emoji {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background-color: #e5e7eb;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+        }
+
         .participant-details {
           display: flex;
           flex-direction: column;
@@ -436,6 +493,16 @@ const DMPage: React.FC<DMPageProps> = ({
         .conversation-status {
           font-size: 14px;
           color: #657786;
+        }
+
+        .remaining-count {
+          color: #059669;
+          font-weight: 500;
+        }
+
+        .limit-reached {
+          color: #dc2626;
+          font-weight: 600;
         }
 
         .back-button {
@@ -582,33 +649,26 @@ const DMPage: React.FC<DMPageProps> = ({
           background-color: #f8f9fa;
         }
 
-        .subscription-gate {
+        .message-limit-reached {
           text-align: center;
           padding: 20px;
-          background-color: #fff3cd;
-          border: 1px solid #ffeaa7;
-          border-radius: 8px;
+          background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+          border: 2px solid #f59e0b;
+          border-radius: 12px;
         }
 
-        .subscription-gate p {
-          margin: 0 0 15px 0;
-          color: #856404;
-          font-size: 16px;
+        .message-limit-reached p {
+          margin: 0;
+          color: #92400e;
+          font-size: 15px;
+          font-weight: 500;
         }
 
-        .subscribe-button {
-          padding: 12px 24px;
-          background-color: #28a745;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .subscribe-button:hover {
-          background-color: #218838;
+        .limit-hint {
+          margin-top: 8px !important;
+          font-size: 13px !important;
+          font-weight: 400 !important;
+          color: #78350f;
         }
 
         .dm-page.error,
