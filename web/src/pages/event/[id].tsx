@@ -294,7 +294,8 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
       }
 
       const { thread } = await response.json();
-      router.push(`/dm/${thread.id}`);
+      console.log(`🔀 [Event Page] Redirecting to DM thread ${thread.id}`);
+      window.location.href = `/dm/${thread.id}`;
     } catch (err) {
       console.error('Error creating DM:', err);
       setError('Failed to start conversation');

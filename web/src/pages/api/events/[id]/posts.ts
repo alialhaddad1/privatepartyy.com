@@ -268,6 +268,8 @@ export default async function handler(
           updated_at: new Date().toISOString()
         };
 
+        console.log(`📝 [Posts API] Creating post for event ${eventId} in ${supabase === supabaseApi ? 'api' : 'public'} schema`);
+
         const { data: post, error } = await supabase
           .from('event_posts')
           .insert(postData)
@@ -275,12 +277,14 @@ export default async function handler(
           .single();
 
         if (error) {
-          console.error('Error creating post:', error);
+          console.error('❌ [Posts API] Error creating post:', error);
           return res.status(500).json({
             error: 'Failed to create post',
             details: error.message
           });
         }
+
+        console.log(`✅ [Posts API] Created post ${post.id} in ${supabase === supabaseApi ? 'api' : 'public'} schema`);
 
         // If this is a multi-media post, insert media items
         if (type === 'media' && mediaItems && mediaItems.length > 0) {
