@@ -431,6 +431,9 @@ const DMPage: React.FC<DMPageProps> = ({
           <div className="message-limit-reached">
             <p>💬 You've reached the {messageLimit} message limit for this conversation.</p>
             <p className="limit-hint">Exchange contact info to continue chatting outside the app!</p>
+            <p className="limit-explanation">
+              ℹ️ We limit messages to encourage sorting out details quickly and connecting in person at the event, rather than chatting endlessly online.
+            </p>
           </div>
         )}
       </div>
@@ -669,6 +672,16 @@ const DMPage: React.FC<DMPageProps> = ({
           font-size: 13px !important;
           font-weight: 400 !important;
           color: #78350f;
+        }
+
+        .limit-explanation {
+          margin-top: 12px !important;
+          padding-top: 12px !important;
+          border-top: 1px solid #fbbf24;
+          font-size: 12px !important;
+          font-weight: 400 !important;
+          color: #78350f;
+          font-style: italic;
         }
 
         .dm-page.error,

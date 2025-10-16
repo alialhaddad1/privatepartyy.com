@@ -158,9 +158,26 @@ export default async function handler(
           return res.status(400).json({ error: 'Cannot DM yourself' });
         }
 
-        // TEMPORARILY DISABLED: DM preference checking
-        // TODO: Fix this properly - for now, allow all DMs
-        console.log(`🔒 [DM Threads] DM preference check DISABLED - allowing all DMs`);
+        // TODO: RE-ENABLE DM PREFERENCE CHECKING
+        // Check if the recipient (otherUserId) allows DMs for this event using the
+        // event_user_preferences table and check_user_allows_dms() function.
+        // The preference is set when users join an event via the checkbox at join/[id].tsx:431-447
+        // Example code to re-enable:
+        //
+        // const { data: recipientAllowsDMs } = await supabase
+        //   .rpc('check_user_allows_dms', {
+        //     p_event_id: eventId,
+        //     p_user_id: otherUserId
+        //   });
+        //
+        // if (!recipientAllowsDMs) {
+        //   return res.status(403).json({
+        //     error: 'This user has disabled direct messages for this event'
+        //   });
+        // }
+        //
+        // TEMPORARILY DISABLED - allowing all DMs for now
+        console.log(`⚠️ [DM Threads] DM preference check DISABLED - allowing all DMs (TODO: re-enable)`);
 
         // Ensure participant order for unique constraint (participant1 < participant2)
         const [participant1Id, participant1Name, participant1Avatar] =

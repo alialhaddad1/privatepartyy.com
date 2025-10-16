@@ -52,16 +52,17 @@ const JoinEventPage: React.FC = () => {
     }
   }, [queryId, queryToken]);
 
-  // Check if user is already logged in via Supabase auth or has localStorage profile
+  // ONLY auto-redirect if user is authenticated via Supabase (Quick Login)
+  // Do NOT auto-redirect for localStorage profiles - they must choose a login method for each event
   useEffect(() => {
     const redirectToEvent = async () => {
       if (!eventId) return; // Wait for eventId to be set
 
-      const storedProfile = localStorage.getItem('userProfile');
+      // Only check Supabase auth, NOT localStorage
       const hasAuth = !!user;
-      const hasProfile = !!storedProfile;
 
-      if (hasAuth || hasProfile) {
+      if (hasAuth) {
+        console.log('✅ User authenticated via Supabase, auto-redirecting to event');
         let finalToken = eventToken;
 
         // If token is missing, fetch it from the API
@@ -83,11 +84,13 @@ const JoinEventPage: React.FC = () => {
         }
 
         if (finalToken) {
-          console.log('Redirecting to event with token:', finalToken);
+          console.log('Redirecting authenticated user to event with token:', finalToken);
           router.push(`/event/${eventId}?token=${finalToken}`);
         } else {
           console.error('Cannot redirect: token is missing after fetch attempt');
         }
+      } else {
+        console.log('ℹ️ No Supabase auth found, showing login options (localStorage profile does not auto-redirect)');
       }
     };
 
@@ -428,6 +431,9 @@ const JoinEventPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* TODO: KEEP THIS DM TOGGLE - Users can opt-out of receiving DMs when joining an event.
+                  This is important for privacy and user control. The toggle should remain visible
+                  and functional. Default is checked (allowDMs = true). */}
               <div className="form-group">
                 <label className="checkbox-label">
                   <input
@@ -438,6 +444,9 @@ const JoinEventPage: React.FC = () => {
                   />
                   <span>Allow other attendees to send me direct messages</span>
                 </label>
+                <small className="input-hint dm-hint">
+                  💬 Limit: 10 messages per conversation to encourage quick details sorting and in-person connection
+                </small>
               </div>
 
               {error && (
@@ -684,6 +693,13 @@ const JoinEventPage: React.FC = () => {
           color: #657786;
           font-size: 12px;
           margin-top: 6px;
+        }
+
+        .dm-hint {
+          text-align: left;
+          margin-top: 8px;
+          font-style: italic;
+          color: #8b96a5;
         }
 
         .avatar-grid {
