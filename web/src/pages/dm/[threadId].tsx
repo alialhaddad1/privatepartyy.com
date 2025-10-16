@@ -51,6 +51,28 @@ const DMPage: React.FC<DMPageProps> = ({
   const [error, setError] = useState<string>('');
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [messageInput, setMessageInput] = useState<string>('');
+  const [localUser, setLocalUser] = useState<User | null>(null);
+  const [localThread, setLocalThread] = useState<Thread>(thread);
+
+  // Load user from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedProfile = localStorage.getItem('userProfile');
+      if (storedProfile) {
+        try {
+          const profile = JSON.parse(storedProfile);
+          setLocalUser({
+            id: profile.id,
+            name: profile.name,
+            avatar: profile.avatar,
+            isSubscribed: false,
+          });
+        } catch (err) {
+          console.error('Error parsing user profile:', err);
+        }
+      }
+    }
+  }, []);
 
   const handleSendMessage = () => {
     if (!messageInput.trim()) return;
@@ -58,12 +80,15 @@ const DMPage: React.FC<DMPageProps> = ({
     setMessageInput('');
   };
 
+  // Use local user if available
+  const currentUser = localUser || user;
+
   // Get the other participant
-  const otherParticipant = thread.participants.find(p => p.id !== user.id);
+  const otherParticipant = localThread.participants.find(p => p.id !== currentUser.id);
 
   const fetchMessages = useCallback(async () => {
     try {
-      const response = await fetch(`/api/dms/${threadId}`, {
+      const response = await fetch(`/api/dm-threads/${threadId}/messages`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -98,9 +123,9 @@ const DMPage: React.FC<DMPageProps> = ({
     const tempMessage: Message = {
       id: tempId,
       content,
-      senderId: user.id,
-      senderName: user.name,
-      senderAvatar: user.avatar,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderAvatar: currentUser.avatar,
       timestamp: new Date().toISOString(),
       type,
     };
@@ -109,7 +134,7 @@ const DMPage: React.FC<DMPageProps> = ({
     setMessages(prev => [...prev, tempMessage]);
 
     try {
-      const response = await fetch(`/api/dms/${threadId}/messages`, {
+      const response = await fetch(`/api/dm-threads/${threadId}/messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -261,12 +286,12 @@ const DMPage: React.FC<DMPageProps> = ({
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`message ${message.senderId === user.id ? 'own-message' : 'other-message'}`}
+              className={`message ${message.senderId === currentUser.id ? 'own-message' : 'other-message'}`}
             >
               <div className="message-content">
                 <div className="message-header">
                   <span className="sender-name">
-                    {message.senderId === user.id ? 'You' : message.senderName}
+                    {message.senderId === currentUser.id ? 'You' : message.senderName}
                   </span>
                   <span className="message-time">
                     {new Date(message.timestamp).toLocaleTimeString()}
@@ -280,7 +305,7 @@ const DMPage: React.FC<DMPageProps> = ({
       </div>
 
       <div className="message-input-container">
-        {user.isSubscribed ? (
+        {currentUser.isSubscribed ? (
           <div className="message-input">
             <input
               type="text"
@@ -466,71 +491,26 @@ const DMPage: React.FC<DMPageProps> = ({
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const { threadId } = context.query;
-  const token = context.req.cookies.authToken;
 
-  if (!token) {
-    return {
-      redirect: {
-        destination: '/login',
-        permanent: false,
+  // For now, return minimal props and let client-side fetch handle it
+  // We'll need user info from localStorage on client side
+  return {
+    props: {
+      initialMessages: [],
+      thread: {
+        id: threadId as string,
+        participants: [], // Will be populated client-side
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       },
-    };
-  }
-
-  try {
-    // Fetch thread and initial messages
-    const [threadResponse, messagesResponse, userResponse] = await Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dms/${threadId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dms/${threadId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }),
-    ]);
-
-    if (!threadResponse.ok || !messagesResponse.ok || !userResponse.ok) {
-      if (threadResponse.status === 401 || messagesResponse.status === 401 || userResponse.status === 401) {
-        return {
-          redirect: {
-            destination: '/login',
-            permanent: false,
-          },
-        };
-      }
-      
-      throw new Error('Failed to fetch data');
-    }
-
-    const [threadData, messagesData, userData] = await Promise.all([
-      threadResponse.json(),
-      messagesResponse.json(),
-      userResponse.json(),
-    ]);
-
-    return {
-      props: {
-        initialMessages: messagesData.messages || [],
-        thread: threadData.thread,
-        user: userData.user,
-        token,
+      user: {
+        id: 'temp',
+        name: 'Loading...',
+        isSubscribed: false,
       },
-    };
-  } catch (error) {
-    console.error('Error in getServerSideProps:', error);
-    
-    return {
-      notFound: true,
-    };
-  }
+      token: (context.query.token as string) || '',
+    },
+  };
 };
 
 export default DMPage;
