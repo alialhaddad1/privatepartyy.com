@@ -80,6 +80,9 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   const [copySuccess, setCopySuccess] = useState(false);
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [allowDMs, setAllowDMs] = useState<boolean | null>(null);
+  const [dmThreads, setDmThreads] = useState<any[]>([]);
+  const [showDMInbox, setShowDMInbox] = useState(false);
 
   // Load user profile from localStorage
   useEffect(() => {
@@ -162,6 +165,62 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 
   // Use server user if available, otherwise use local user
   const user = serverUser || localUser;
+
+  // Fetch user preferences (including allowDMs setting)
+  useEffect(() => {
+    const fetchUserPreferences = async () => {
+      if (!user || !id) return;
+
+      try {
+        const response = await fetch(`/api/events/user-preferences?eventId=${id}&userId=${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setAllowDMs(data.preferences.allowDMs);
+        } else {
+          // Default to true if no preference found
+          setAllowDMs(true);
+        }
+      } catch (err) {
+        console.error('Error fetching user preferences:', err);
+        setAllowDMs(true);
+      }
+    };
+
+    fetchUserPreferences();
+  }, [user, id, token]);
+
+  // Fetch DM threads if user allows DMs
+  useEffect(() => {
+    const fetchDMThreads = async () => {
+      if (!user || !id || allowDMs === null || !allowDMs) return;
+
+      try {
+        const response = await fetch(`/api/events/${id}/dm-threads?userId=${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setDmThreads(data.threads || []);
+        }
+      } catch (err) {
+        console.error('Error fetching DM threads:', err);
+      }
+    };
+
+    fetchDMThreads();
+
+    // Poll for new threads every 30 seconds
+    const interval = setInterval(fetchDMThreads, 30000);
+    return () => clearInterval(interval);
+  }, [user, id, token, allowDMs]);
 
   // One-time logging on mount
   useEffect(() => {
@@ -496,12 +555,63 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
         <div className="error-banner">
           {error}
           {error.includes('Subscribe') && (
-            <button 
+            <button
               onClick={() => router.push('/subscribe')}
               className="subscribe-link"
             >
               Subscribe Now
             </button>
+          )}
+        </div>
+      )}
+
+      {/* DM Inbox Section - Only show if user allows DMs and has threads */}
+      {user && allowDMs && dmThreads.length > 0 && (
+        <div className="dm-inbox-section">
+          <div className="dm-inbox-header">
+            <button
+              onClick={() => setShowDMInbox(!showDMInbox)}
+              className="dm-inbox-toggle"
+            >
+              <span className="dm-inbox-title">
+                💬 Messages {dmThreads.length > 0 && <span className="dm-count">({dmThreads.length})</span>}
+              </span>
+              <span className="dm-toggle-icon">{showDMInbox ? '▼' : '▶'}</span>
+            </button>
+          </div>
+
+          {showDMInbox && (
+            <div className="dm-threads-list">
+              {dmThreads.map((thread) => {
+                // Determine who the other person is
+                const isParticipant1 = thread.participant1Id === user.id;
+                const otherParticipantName = isParticipant1 ? thread.participant2Name : thread.participant1Name;
+                const otherParticipantAvatar = isParticipant1 ? thread.participant2Avatar : thread.participant1Avatar;
+
+                return (
+                  <div
+                    key={thread.id}
+                    className="dm-thread-item"
+                    onClick={() => router.push(`/dm/${thread.id}`)}
+                  >
+                    <div className="dm-thread-avatar">
+                      {otherParticipantAvatar}
+                    </div>
+                    <div className="dm-thread-info">
+                      <div className="dm-thread-name">{otherParticipantName}</div>
+                      {thread.lastMessageAt && (
+                        <div className="dm-thread-time">
+                          {new Date(thread.lastMessageAt).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                    {thread.messageCount > 0 && (
+                      <div className="dm-thread-count">{thread.messageCount}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -1040,6 +1150,116 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
           color: #856404;
         }
 
+        .dm-inbox-section {
+          margin: 0 20px 20px 20px;
+          background-color: white;
+          border-radius: 8px;
+          border: 1px solid #e1e8ed;
+          overflow: hidden;
+        }
+
+        .dm-inbox-header {
+          border-bottom: 1px solid #e1e8ed;
+        }
+
+        .dm-inbox-toggle {
+          width: 100%;
+          padding: 16px 20px;
+          background: none;
+          border: none;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .dm-inbox-toggle:hover {
+          background-color: #f8f9fa;
+        }
+
+        .dm-inbox-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #1a1a1a;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .dm-count {
+          color: #1da1f2;
+          font-weight: 700;
+        }
+
+        .dm-toggle-icon {
+          color: #657786;
+          font-size: 12px;
+        }
+
+        .dm-threads-list {
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        .dm-thread-item {
+          display: flex;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid #f0f2f5;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          gap: 12px;
+        }
+
+        .dm-thread-item:last-child {
+          border-bottom: none;
+        }
+
+        .dm-thread-item:hover {
+          background-color: #f8f9fa;
+        }
+
+        .dm-thread-avatar {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          flex-shrink: 0;
+        }
+
+        .dm-thread-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .dm-thread-name {
+          font-size: 15px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin-bottom: 4px;
+        }
+
+        .dm-thread-time {
+          font-size: 13px;
+          color: #657786;
+        }
+
+        .dm-thread-count {
+          background-color: #1da1f2;
+          color: white;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 8px;
+          border-radius: 12px;
+          min-width: 24px;
+          text-align: center;
+        }
+
         @media (max-width: 768px) {
           .event-header {
             flex-direction: column;
@@ -1063,6 +1283,10 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
           }
 
           .error-banner {
+            margin: 0 10px 20px 10px;
+          }
+
+          .dm-inbox-section {
             margin: 0 10px 20px 10px;
           }
         }
