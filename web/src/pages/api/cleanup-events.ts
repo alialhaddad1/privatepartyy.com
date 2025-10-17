@@ -49,21 +49,22 @@ export default async function handler(
     console.log('🧹 [Cleanup] Starting event cleanup...');
 
     // Get the start of the next day (tomorrow at midnight)
-    // This ensures we delete ALL events from today and earlier
+    // This ensures we delete ALL events created today or earlier
     const tomorrow = new Date();
-    tomorrow.setHours(24, 0, 0, 0); // Set to midnight of next day
-    const tomorrowString = tomorrow.toISOString().split('T')[0];
+    tomorrow.setUTCHours(0, 0, 0, 0); // Set to midnight UTC of next day
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const tomorrowISO = tomorrow.toISOString();
 
-    console.log(`🧹 [Cleanup] Deleting all events before ${tomorrowString} (including today's events)`);
+    console.log(`🧹 [Cleanup] Deleting all events created before ${tomorrowISO} (including today's events)`);
 
     let totalDeleted = 0;
     const deletionResults = [];
 
-    // Delete from api schema
+    // Delete from api schema - check created_at, not date
     const { data: apiData, error: apiError } = await supabaseApi
       .from('events')
       .delete()
-      .lt('date', tomorrowString)
+      .lt('created_at', tomorrowISO)
       .select();
 
     if (apiError) {
@@ -76,11 +77,11 @@ export default async function handler(
       deletionResults.push({ schema: 'api', status: 'success', count: apiDeletedCount });
     }
 
-    // Delete from public schema
+    // Delete from public schema - check created_at, not date
     const { data: publicData, error: publicError } = await supabasePublic
       .from('events')
       .delete()
-      .lt('date', tomorrowString)
+      .lt('created_at', tomorrowISO)
       .select();
 
     if (publicError) {

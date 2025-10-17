@@ -139,85 +139,431 @@ const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onCl
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    const diffWeeks = Math.floor(diffDays / 7);
+
+    if (diffSecs < 60) return 'just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
+    if (diffWeeks < 4) return `${diffWeeks}w`;
+    return date.toLocaleDateString();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Comments</h2>
-          <button 
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-          >
-            ×
-          </button>
-        </div>
+    <>
+      <div className="comment-modal-overlay" onClick={onClose}>
+        <div className="comment-modal-container" onClick={e => e.stopPropagation()}>
+          {/* Header */}
+          <div className="comment-modal-header">
+            <h2 className="comment-modal-title">Comments</h2>
+            <button
+              onClick={onClose}
+              className="comment-modal-close"
+              aria-label="Close"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
 
-        {/* Comments List */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {loading ? (
-            <div className="text-center py-8">Loading comments...</div>
-          ) : comments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No comments yet</div>
-          ) : (
-            <div className="space-y-4">
-              {comments.map(comment => (
-                <div key={comment.id} className="flex space-x-3">
-                  <div className="flex-shrink-0">
-                    {comment.author.avatar ? (
-                      <img 
-                        src={comment.author.avatar} 
-                        alt={comment.author.name}
-                        className="w-8 h-8 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                        {comment.author.name.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-sm">{comment.author.name}</span>
-                      <span className="text-xs text-gray-500">{formatDate(comment.createdAt)}</span>
+          {/* Comments List */}
+          <div className="comment-modal-content">
+            {loading ? (
+              <div className="comment-loading">
+                <div className="loading-spinner"></div>
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="comment-empty">
+                <div className="empty-icon">💬</div>
+                <p className="empty-text">No comments yet</p>
+                <p className="empty-subtext">Be the first to comment</p>
+              </div>
+            ) : (
+              <div className="comments-list">
+                {comments.map(comment => (
+                  <div key={comment.id} className="comment-item">
+                    <div className="comment-avatar">
+                      {comment.author.avatar ? (
+                        <div className="avatar-wrapper">
+                          <span className="avatar-emoji">{comment.author.avatar}</span>
+                        </div>
+                      ) : (
+                        <div className="avatar-fallback">
+                          <span>{comment.author.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm mt-1">{comment.content}</p>
+                    <div className="comment-content">
+                      <div className="comment-body">
+                        <span className="comment-author">{comment.author.name}</span>
+                        <span className="comment-text">{comment.content}</span>
+                      </div>
+                      <div className="comment-meta">
+                        <span className="comment-time">{formatDate(comment.createdAt)}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Comment Form */}
+          {token && user ? (
+            <div className="comment-modal-footer">
+              <div className="comment-input-avatar">
+                {user.avatar ? (
+                  <div className="avatar-wrapper-small">
+                    <span className="avatar-emoji-small">{user.avatar}</span>
+                  </div>
+                ) : (
+                  <div className="avatar-fallback-small">
+                    <span>{user.name.charAt(0).toUpperCase()}</span>
+                  </div>
+                )}
+              </div>
+              <form onSubmit={handleSubmitComment} className="comment-input-form">
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="comment-input"
+                  disabled={submitting}
+                  maxLength={500}
+                />
+                {newComment.trim() && (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="comment-submit"
+                  >
+                    {submitting ? 'Posting...' : 'Post'}
+                  </button>
+                )}
+              </form>
+            </div>
+          ) : (
+            <div className="comment-modal-footer-login">
+              <p>Log in to comment</p>
             </div>
           )}
         </div>
-
-        {/* Comment Form */}
-        {token && user && (
-          <div className="p-4 border-t">
-            <form onSubmit={handleSubmitComment} className="flex space-x-3">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Write a comment..."
-                className="flex-1 border rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-                disabled={submitting}
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim() || submitting}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed self-end"
-              >
-                {submitting ? 'Posting...' : 'Post'}
-              </button>
-            </form>
-          </div>
-        )}
       </div>
-    </div>
+
+      <style jsx>{`
+        .comment-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.65);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 20px;
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .comment-modal-container {
+          background: white;
+          border-radius: 12px;
+          width: 100%;
+          max-width: 500px;
+          max-height: 85vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+          animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .comment-modal-header {
+          padding: 16px 20px;
+          border-bottom: 1px solid #efefef;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-shrink: 0;
+        }
+
+        .comment-modal-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #000;
+          margin: 0;
+        }
+
+        .comment-modal-close {
+          background: none;
+          border: none;
+          padding: 8px;
+          cursor: pointer;
+          color: #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: background-color 0.2s;
+        }
+
+        .comment-modal-close:hover {
+          background-color: #f5f5f5;
+        }
+
+        .comment-modal-content {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px 0;
+          min-height: 200px;
+        }
+
+        .comment-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+        }
+
+        .loading-spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid #dbdbdb;
+          border-top-color: #000;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .comment-empty {
+          text-align: center;
+          padding: 60px 20px;
+        }
+
+        .empty-icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+          opacity: 0.5;
+        }
+
+        .empty-text {
+          font-size: 16px;
+          font-weight: 600;
+          color: #262626;
+          margin: 0 0 4px 0;
+        }
+
+        .empty-subtext {
+          font-size: 14px;
+          color: #8e8e8e;
+          margin: 0;
+        }
+
+        .comments-list {
+          padding: 0;
+        }
+
+        .comment-item {
+          display: flex;
+          padding: 12px 20px;
+          gap: 12px;
+          transition: background-color 0.15s;
+        }
+
+        .comment-item:hover {
+          background-color: #fafafa;
+        }
+
+        .comment-avatar {
+          flex-shrink: 0;
+        }
+
+        .avatar-wrapper, .avatar-fallback {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+
+        .avatar-wrapper {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .avatar-emoji {
+          font-size: 18px;
+        }
+
+        .avatar-fallback {
+          background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+          font-size: 14px;
+          font-weight: 600;
+          color: white;
+        }
+
+        .comment-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .comment-body {
+          margin-bottom: 4px;
+          line-height: 18px;
+        }
+
+        .comment-author {
+          font-weight: 600;
+          font-size: 14px;
+          color: #262626;
+          margin-right: 6px;
+        }
+
+        .comment-text {
+          font-size: 14px;
+          color: #262626;
+          word-wrap: break-word;
+        }
+
+        .comment-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .comment-time {
+          font-size: 12px;
+          color: #8e8e8e;
+        }
+
+        .comment-modal-footer {
+          padding: 16px 20px;
+          border-top: 1px solid #efefef;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-shrink: 0;
+        }
+
+        .comment-modal-footer-login {
+          padding: 16px 20px;
+          border-top: 1px solid #efefef;
+          text-align: center;
+          color: #8e8e8e;
+          font-size: 14px;
+        }
+
+        .comment-input-avatar {
+          flex-shrink: 0;
+        }
+
+        .avatar-wrapper-small, .avatar-fallback-small {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+
+        .avatar-wrapper-small {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .avatar-emoji-small {
+          font-size: 16px;
+        }
+
+        .avatar-fallback-small {
+          background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+          font-size: 12px;
+          font-weight: 600;
+          color: white;
+        }
+
+        .comment-input-form {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .comment-input {
+          flex: 1;
+          border: none;
+          outline: none;
+          font-size: 14px;
+          color: #262626;
+          padding: 0;
+          background: transparent;
+        }
+
+        .comment-input::placeholder {
+          color: #8e8e8e;
+        }
+
+        .comment-input:disabled {
+          opacity: 0.5;
+        }
+
+        .comment-submit {
+          background: none;
+          border: none;
+          color: #0095f6;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          padding: 0;
+          transition: opacity 0.2s;
+        }
+
+        .comment-submit:hover:not(:disabled) {
+          opacity: 0.7;
+        }
+
+        .comment-submit:disabled {
+          opacity: 0.3;
+          cursor: default;
+        }
+
+        @media (max-width: 640px) {
+          .comment-modal-container {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 12px 12px 0 0;
+          }
+        }
+      `}</style>
+    </>
   );
 };
 
