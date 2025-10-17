@@ -119,10 +119,12 @@ describe('Data Consistency Tests', () => {
 
     // Mock upload service implementation
     mockUploadService.uploadPost.mockImplementation(async (file: File, postData: any) => {
+      let storageResponse;
+      let cleanupDone = false;
       try {
         // Step 1: Upload file to storage
-        const storageResponse = await mockStorageUpload(`uploads/${file.name}`, file);
-        
+        storageResponse = await mockStorageUpload(`uploads/${file.name}`, file);
+
         if (storageResponse.error) {
           throw new Error(`Storage upload failed: ${storageResponse.error.message}`);
         }
@@ -136,6 +138,7 @@ describe('Data Consistency Tests', () => {
         if (dbResponse.error) {
           // Database insert failed - cleanup orphaned file
           await mockUploadService.cleanupOrphanedFile(storageResponse.data.path);
+          cleanupDone = true;
           throw new Error(`Database insert failed: ${dbResponse.error.message}`);
         }
 
@@ -145,6 +148,11 @@ describe('Data Consistency Tests', () => {
           storagePath: storageResponse.data.path
         };
       } catch (error) {
+        // If storage succeeded but database failed (including promise rejection), cleanup
+        // Only cleanup if we haven't already done so
+        if (!cleanupDone && storageResponse && storageResponse.data) {
+          await mockUploadService.cleanupOrphanedFile(storageResponse.data.path);
+        }
         throw error;
       }
     });

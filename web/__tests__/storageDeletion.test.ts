@@ -34,12 +34,7 @@ let mockPostsDb: Post[] = [];
 
 // Mock console.log to track cleanup logs
 const originalConsoleLog = console.log;
-const logMessages: string[] = [];
-
-console.log = jest.fn((...args: any[]) => {
-  logMessages.push(args.join(' '));
-  originalConsoleLog(...args);
-});
+let logMessages: string[] = [];
 
 // Cleanup function
 const cleanupExpiredPosts = async (expiryHours: number = 12) => {
@@ -86,7 +81,13 @@ describe('Storage Deletion Tests - Photo Expiry and Cleanup', () => {
     jest.clearAllMocks();
     (mockStorageRemove as any).mockResolvedValue({ data: null, error: null });
     mockPostsDb = [];
-    logMessages.length = 0;
+    logMessages = [];
+
+    // Mock console.log to capture logs
+    console.log = jest.fn((...args: any[]) => {
+      logMessages.push(args.join(' '));
+      originalConsoleLog(...args);
+    });
 
     // Setup mock implementations
     mockDbFrom.mockImplementation(((table: string) => {

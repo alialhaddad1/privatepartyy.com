@@ -163,7 +163,7 @@ describe('Expired QR Codes Tests', () => {
     mockEventService.isEventExpired.mockImplementation((event: Event) => {
       const eventEndDate = new Date(event.end_date || event.event_date);
       const now = new Date();
-      return eventEndDate < now;
+      return eventEndDate <= now;
     });
 
     mockEventService.fetchFeed.mockImplementation(async (eventId: string) => {
@@ -629,8 +629,8 @@ describe('Expired QR Codes Tests', () => {
         error: null
       });
 
-      // Should be considered expired (using < comparison)
-      expect(mockEventService.isEventExpired(boundaryEvent)).toBe(false); // Exactly at boundary
+      // Should be considered expired (using <= comparison for safety)
+      expect(mockEventService.isEventExpired(boundaryEvent)).toBe(true); // Exactly at boundary should be expired
       
       // But in practice, system clock differences mean we should treat "now" as expired
       const slightlyPastEvent = {

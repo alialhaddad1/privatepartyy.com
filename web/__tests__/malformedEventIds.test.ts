@@ -129,7 +129,8 @@ describe('Malformed Event IDs Tests', () => {
         /<embed[^>]*>/i,
         /<object[^>]*>/i,
         /eval\s*\(/i,
-        /expression\s*\(/i
+        /expression\s*\(/i,
+        /<[^>]*script[^>]*>/i, // Catch any tag with "script" in it
       ];
 
       return xssPatterns.some(pattern => pattern.test(input));

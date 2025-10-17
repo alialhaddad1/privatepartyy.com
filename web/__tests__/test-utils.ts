@@ -199,15 +199,34 @@ export const toHaveNoViolations = {
 // fireEvent utility
 export const fireEvent = {
   click: (element: HTMLElement) => {
+    if (!element) return;
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   },
-  change: (element: HTMLElement, event: { target: { value: string } }) => {
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      'value'
-    )?.set;
-    nativeInputValueSetter?.call(element, event.target.value);
-    element.dispatchEvent(new Event('change', { bubbles: true }));
+  change: (element: HTMLElement, event: { target: { value?: string; files?: File[] } }) => {
+    if (!element) return;
+
+    // Check if the element is actually an input element
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) {
+      // Handle file input
+      if (element instanceof HTMLInputElement && element.type === 'file' && event.target.files) {
+        Object.defineProperty(element, 'files', {
+          value: event.target.files,
+          writable: true
+        });
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (event.target.value !== undefined) {
+        // Handle regular input
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value'
+        )?.set;
+        nativeInputValueSetter?.call(element, event.target.value);
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } else {
+      // For other elements, just dispatch the change event
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 };
 

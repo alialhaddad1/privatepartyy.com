@@ -86,6 +86,10 @@ describe('Error Handling Tests', () => {
     mockConsoleWarn.mockClear();
     mockConsoleLog.mockClear();
 
+    // Reset QR mock implementations
+    mockGenerateQRCode.mockReset();
+    mockParseQRCode.mockReset();
+
     // Setup mock functions
     mockStorageUpload = jest.fn();
     mockDatabaseInsert = jest.fn();
@@ -396,6 +400,18 @@ describe('Error Handling Tests', () => {
         // Simulate real parseQRCode behavior - return null for invalid URLs
         if (!url || typeof url !== 'string') return null;
         if (!url.startsWith('https://')) return null;
+
+        // Check for allowed domains
+        try {
+          const urlObj = new URL(url);
+          const allowedDomains = ['app.example.com', 'myapp.com'];
+          if (!allowedDomains.includes(urlObj.hostname)) {
+            return null;
+          }
+        } catch {
+          return null;
+        }
+
         if (!url.includes('/event/')) return null;
 
         // If URL doesn't match expected pattern, return null

@@ -1,11 +1,5 @@
 import { jest } from '@jest/globals';
 import { generateQRCode, parseQRCode } from '../src/lib/qr';
-import QRCode from 'qrcode';
-
-// Mock QR code library
-jest.mock('qrcode', () => ({
-  toDataURL: jest.fn(),
-}));
 
 describe('Create Event and QR Code Tests', () => {
   const testEventId = 'test_event';
