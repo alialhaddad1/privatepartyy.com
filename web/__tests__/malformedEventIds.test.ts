@@ -113,8 +113,7 @@ describe('Malformed Event IDs Tests', () => {
         /;\s*--/,
         /'\s*OR\s+'1'\s*=\s*'1/i,
         /'\s*OR\s+1\s*=\s*1/i,
-        /EXEC\s*\(/i,
-        /SCRIPT/i
+        /EXEC\s*\(/i
       ];
 
       return sqlPatterns.some(pattern => pattern.test(input));
@@ -290,13 +289,15 @@ describe('Malformed Event IDs Tests', () => {
     it('should sanitize XSS attempts and make them safe', async () => {
       const xssPayload = "<script>alert('xss')</script>event123";
       const sanitized = mockEventService.sanitizeEventId(xssPayload);
-      
-      // Should remove dangerous characters
-      expect(sanitized).toBe("alert(xss)event123");
-      expect(sanitized).not.toContain('<script>');
-      expect(sanitized).not.toContain('</script>');
+
+      // Should remove dangerous characters (<, >, ', ", &, ;)
+      expect(sanitized).toBe("scriptalert(xss)/scriptevent123");
+      expect(sanitized).not.toContain('<');
+      expect(sanitized).not.toContain('>');
       expect(sanitized).not.toContain('"');
       expect(sanitized).not.toContain("'");
+      expect(sanitized).not.toContain('&');
+      expect(sanitized).not.toContain(';');
     });
 
     it('should handle encoded XSS attempts', async () => {

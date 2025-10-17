@@ -30,4 +30,8 @@ module.exports = {
     '/node_modules/',
     '/.next/',
   ],
+  testMatch: [
+    '**/__tests__/**/*.test.[jt]s?(x)',
+    '**/__tests__/**/*.tests.[jt]s?(x)',
+  ],
 };
