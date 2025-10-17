@@ -592,7 +592,10 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                   <div
                     key={thread.id}
                     className="dm-thread-item"
-                    onClick={() => router.push(`/dm/${thread.id}`)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/dm/${thread.id}`;
+                    }}
                   >
                     <div className="dm-thread-avatar">
                       {otherParticipantAvatar}
