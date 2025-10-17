@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Header from '../../components/Header';
 import Feed from '../../components/Feed';
 import UploadWidget from '../../components/UploadWidget';
+import CommentModal from '../../components/CommentModal';
 
 interface MediaItem {
   id: string;
@@ -77,6 +78,8 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   const [eventData, setEventData] = useState<EventData>(event);
   const [isUserHost, setIsUserHost] = useState(isHost);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   // Load user profile from localStorage
   useEffect(() => {
@@ -215,7 +218,7 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
 
     try {
       const post = posts.find(p => p.id === postId);
-      const wasLiked = post?.isLiked;
+      const wasLiked = post?.isLiked ?? false;
 
       // Optimistically update UI
       setPosts(prev => prev.map(p => {
@@ -235,11 +238,11 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId: user.id,
-          userName: user.name,
-          userAvatar: user.avatar || '👤'
-        }),
+        body: JSON.stringify(
+          wasLiked
+            ? { userId: user.id }
+            : { userId: user.id, userName: user.name, userAvatar: user.avatar || '👤' }
+        ),
       });
 
       if (!response.ok) {
@@ -278,10 +281,15 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
   };
 
   const handleComment = async (postId: string) => {
-    // TODO: Implement comment functionality
-    // This will eventually open a modal or navigate to post detail
-    // For now, disable the button by not doing anything
-    console.log('Comment clicked for post:', postId);
+    setSelectedPostId(postId);
+    setCommentModalOpen(true);
+  };
+
+  const handleCommentModalClose = () => {
+    setCommentModalOpen(false);
+    setSelectedPostId(null);
+    // Refresh posts to get updated comment counts
+    fetchPosts(false);
   };
 
   const handleDM = async (userId: string) => {
@@ -581,8 +589,6 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
                     <button
                       onClick={() => handleComment(post.id)}
                       className="action-button comment-button"
-                      disabled
-                      title="Comments coming soon"
                     >
                       💬 {post.comments}
                     </button>
@@ -608,6 +614,16 @@ const EventFeedPage: React.FC<EventFeedPageProps> = ({
           </div>
         )}
       </div>
+
+      {selectedPostId && (
+        <CommentModal
+          postId={selectedPostId}
+          token={token}
+          isOpen={commentModalOpen}
+          onClose={handleCommentModalClose}
+          user={user}
+        />
+      )}
 
       <style>{`
         .event-page {

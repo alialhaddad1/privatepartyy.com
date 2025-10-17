@@ -12,6 +12,11 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
+/**
+ * Check if an email exists in the system
+ * Note: This app uses passwordless authentication only
+ * All logins are done via magic links sent to email
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -36,19 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
     if (!user) {
-      // User doesn't exist
+      // User doesn't exist - will be created on first magic link request
       return res.status(200).json({ exists: false, hasPassword: false });
     }
 
-    // Check if user has encrypted_password (indicates password-based auth)
-    // If user was created with magic link or OAuth, they won't have this
-    const hasPassword = user.app_metadata?.provider === 'email' &&
-                       (user as any).encrypted_password !== undefined &&
-                       (user as any).encrypted_password !== '';
-
+    // User exists - always return hasPassword: false since we use passwordless auth
     return res.status(200).json({
       exists: true,
-      hasPassword: hasPassword
+      hasPassword: false // Always false - we only use magic links
     });
 
   } catch (error) {

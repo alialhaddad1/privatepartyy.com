@@ -94,28 +94,62 @@ export default async function handler(
           // Update existing profile in the schema where it was found
           console.log(`✏️ [Profile API] Updating existing profile for ${profileData.email} in ${profileResult.schema} schema`);
 
+          // Only update fields that exist in the schema
+          const updateData: any = {
+            display_name: profileData.name,
+            generation: profileData.generation,
+            is_anonymous: profileData.isAnonymous,
+            updated_at: new Date().toISOString()
+          };
+
+          // Only include avatar if it's provided
+          if (profileData.avatar) {
+            updateData.avatar_url = profileData.avatar;
+          }
+
           const { data, error } = await supabase
             .from('user_profiles')
-            .update({
-              display_name: profileData.name,
-              avatar_url: profileData.avatar,
-              generation: profileData.generation,
-              is_anonymous: profileData.isAnonymous,
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('email', profileData.email.toLowerCase())
             .select()
             .single();
 
           if (error) {
             console.error('❌ [Profile API] Error updating profile:', error);
-            return res.status(500).json({
-              error: 'Failed to update profile',
-              details: error.message
-            });
-          }
 
-          result = data;
+            // If it's a schema cache error, try a more minimal update
+            if (error.code === 'PGRST204') {
+              console.log('⚠️ [Profile API] Schema cache error, trying minimal update');
+              const minimalUpdate: any = {
+                display_name: profileData.name,
+                updated_at: new Date().toISOString()
+              };
+
+              const { data: retryData, error: retryError } = await supabase
+                .from('user_profiles')
+                .update(minimalUpdate)
+                .eq('email', profileData.email.toLowerCase())
+                .select()
+                .single();
+
+              if (retryError) {
+                console.error('❌ [Profile API] Retry failed:', retryError);
+                return res.status(500).json({
+                  error: 'Failed to update profile',
+                  details: retryError.message
+                });
+              }
+
+              result = retryData;
+            } else {
+              return res.status(500).json({
+                error: 'Failed to update profile',
+                details: error.message
+              });
+            }
+          } else {
+            result = data;
+          }
         } else {
           // Create new profile - try api schema first, then public
           console.log('✨ [Profile API] Creating new profile for:', profileData.email);

@@ -16,12 +16,9 @@ interface AuthContextType {
   profile: UserProfile | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signInWithEmail: (email: string) => Promise<{ error: any; needsPassword?: boolean }>;
+  signInWithEmail: (email: string, redirectTo?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: any }>;
-  checkEmailHasPassword: (email: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,53 +76,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            display_name: displayName || email.split('@')[0]
-          }
-        }
-      });
-      return { error };
-    } catch (error) {
-      return { error };
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      return { error };
-    } catch (error) {
-      return { error };
-    }
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
-  const signInWithEmail = async (email: string) => {
+  const signInWithEmail = async (email: string, redirectTo?: string) => {
     try {
-      // First check if user exists and has a password set
-      const hasPassword = await checkEmailHasPassword(email);
-
-      if (hasPassword) {
-        return { error: null, needsPassword: true };
-      }
-
-      // User exists but no password - send magic link for passwordless login
+      // Send magic link for passwordless login
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: true,
+          shouldCreateUser: true, // Auto-create user if they don't exist
+          emailRedirectTo: redirectTo,
+          data: {
+            display_name: email.split('@')[0]
+          }
         }
       });
 
@@ -133,33 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
       }
 
-      return { error: null, needsPassword: false };
+      return { error: null };
     } catch (error) {
       return { error };
-    }
-  };
-
-  const checkEmailHasPassword = async (email: string): Promise<boolean> => {
-    try {
-      // Try to get user by email - this is a workaround since Supabase doesn't expose password status directly
-      // We'll make an API call to check if email exists in auth.users and if it has a password
-      const response = await fetch('/api/auth/check-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.hasPassword || false;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Error checking email password status:', error);
-      return false;
     }
   };
 
@@ -191,12 +132,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     session,
     loading,
-    signUp,
-    signIn,
     signInWithEmail,
     signOut,
-    updateProfile,
-    checkEmailHasPassword
+    updateProfile
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

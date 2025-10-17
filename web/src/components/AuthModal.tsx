@@ -7,14 +7,21 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { signIn, signUp } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const { signInWithEmail, user } = useAuth();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // If user is already logged in, close modal
+  React.useEffect(() => {
+    if (isOpen && user) {
+      setMessage('You are already logged in!');
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    }
+  }, [isOpen, user, onClose]);
 
   if (!isOpen) return null;
 
@@ -25,44 +32,32 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        const { error } = await signUp(email, password, displayName);
-        if (error) {
-          setError(error.message || 'Failed to sign up');
-        } else {
-          setMessage('Check your email to confirm your account!');
-          setTimeout(() => {
-            setIsSignUp(false);
-            setMessage('');
-            setEmail('');
-            setPassword('');
-            setDisplayName('');
-          }, 3000);
-        }
-      } else {
-        const { error } = await signIn(email, password);
-        if (error) {
-          setError(error.message || 'Failed to sign in');
-        } else {
-          onClose();
-          setEmail('');
-          setPassword('');
-        }
+      const { error } = await signInWithEmail(email);
+
+      if (error) {
+        setError(error.message || 'Failed to send magic link');
+        setLoading(false);
+        return;
       }
+
+      // Magic link sent successfully
+      setMessage('Check your email for a login link! It may take a minute to arrive.');
+      setLoading(false);
+
+      // Keep modal open so user can see the success message
+      setTimeout(() => {
+        handleClose();
+      }, 5000);
     } catch (err) {
       setError('An unexpected error occurred');
-    } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
     setEmail('');
-    setPassword('');
-    setDisplayName('');
     setError('');
     setMessage('');
-    setIsSignUp(false);
     onClose();
   };
 
@@ -74,23 +69,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             ×
           </button>
 
-          <h2 className="modal-title">{isSignUp ? 'Sign Up' : 'Log In'}</h2>
+          <h2 className="modal-title">Passwordless Login</h2>
+          <p className="modal-subtitle">
+            Enter your email and we'll send you a magic link to log in instantly
+          </p>
 
           <form onSubmit={handleSubmit} className="auth-form">
-            {isSignUp && (
-              <div className="form-group">
-                <label htmlFor="displayName">Display Name</label>
-                <input
-                  type="text"
-                  id="displayName"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Enter your name"
-                  required={isSignUp}
-                />
-              </div>
-            )}
-
             <div className="form-group">
               <label htmlFor="email">Email</label>
               <input
@@ -100,44 +84,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-                minLength={6}
+                autoFocus
+                disabled={loading || !!message}
               />
             </div>
 
             {error && <div className="error-message">{error}</div>}
             {message && <div className="success-message">{message}</div>}
 
-            <button type="submit" className="submit-button" disabled={loading}>
-              {loading ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Log In'}
+            <button type="submit" className="submit-button" disabled={loading || !!message}>
+              {loading ? 'Sending...' : message ? 'Link Sent!' : 'Send Magic Link'}
             </button>
-          </form>
 
-          <div className="toggle-mode">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-            <button
-              type="button"
-              className="toggle-button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError('');
-                setMessage('');
-              }}
-            >
-              {isSignUp ? 'Log In' : 'Sign Up'}
-            </button>
-          </div>
+            <p className="info-text">
+              No password needed! We'll send you a secure link to log in. If you don't have an account, we'll create one for you automatically.
+            </p>
+          </form>
         </div>
       </div>
 
@@ -188,8 +150,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           font-size: 28px;
           font-weight: 700;
           color: #1a1a1a;
-          margin: 0 0 30px 0;
+          margin: 0 0 10px 0;
           text-align: center;
+        }
+
+        .modal-subtitle {
+          font-size: 14px;
+          color: #657786;
+          text-align: center;
+          margin: 0 0 30px 0;
         }
 
         .auth-form {
@@ -262,25 +231,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           cursor: not-allowed;
         }
 
-        .toggle-mode {
+        .info-text {
           text-align: center;
-          margin-top: 20px;
-          font-size: 14px;
+          font-size: 12px;
           color: #657786;
-        }
-
-        .toggle-button {
-          background: none;
-          border: none;
-          color: #667eea;
-          font-weight: 600;
-          cursor: pointer;
-          margin-left: 5px;
-          text-decoration: underline;
-        }
-
-        .toggle-button:hover {
-          color: #764ba2;
+          margin: 0;
+          line-height: 1.4;
         }
 
         @media (max-width: 480px) {

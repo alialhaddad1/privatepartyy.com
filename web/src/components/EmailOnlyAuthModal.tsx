@@ -8,13 +8,11 @@ interface EmailOnlyAuthModalProps {
 }
 
 const EmailOnlyAuthModal: React.FC<EmailOnlyAuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { signInWithEmail, signIn, user } = useAuth();
+  const { signInWithEmail, user } = useAuth();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [needsPassword, setNeedsPassword] = useState(false);
 
   // If user is already logged in, close modal and trigger success immediately
   React.useEffect(() => {
@@ -38,53 +36,23 @@ const EmailOnlyAuthModal: React.FC<EmailOnlyAuthModalProps> = ({ isOpen, onClose
     setLoading(true);
 
     try {
-      const { error, needsPassword: requiresPassword } = await signInWithEmail(email);
+      const { error } = await signInWithEmail(email);
 
       if (error) {
-        setError(error.message || 'Failed to process email');
+        setError(error.message || 'Failed to send magic link');
         setLoading(false);
         return;
       }
 
-      if (requiresPassword) {
-        // User has a password, show password field
-        setNeedsPassword(true);
-        setLoading(false);
-      } else {
-        // Magic link sent
-        setMessage('Check your email for a login link!');
-        setLoading(false);
-        setTimeout(() => {
-          if (onSuccess) onSuccess();
-          handleClose();
-        }, 3000);
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
+      // Magic link sent successfully
+      setMessage('Check your email for a login link! It may take a minute to arrive.');
       setLoading(false);
-    }
-  };
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-    setLoading(true);
-
-    try {
-      const { error } = await signIn(email, password);
-
-      if (error) {
-        setError(error.message || 'Failed to sign in');
-        setLoading(false);
-        return;
-      }
-
-      setMessage('Successfully logged in!');
+      // Keep modal open so user can see the success message
       setTimeout(() => {
         if (onSuccess) onSuccess();
         handleClose();
-      }, 1000);
+      }, 5000); // Give them time to read the message
     } catch (err) {
       setError('An unexpected error occurred');
       setLoading(false);
@@ -93,17 +61,9 @@ const EmailOnlyAuthModal: React.FC<EmailOnlyAuthModalProps> = ({ isOpen, onClose
 
   const handleClose = () => {
     setEmail('');
-    setPassword('');
     setError('');
     setMessage('');
-    setNeedsPassword(false);
     onClose();
-  };
-
-  const handleBack = () => {
-    setNeedsPassword(false);
-    setPassword('');
-    setError('');
   };
 
   return (
@@ -114,84 +74,37 @@ const EmailOnlyAuthModal: React.FC<EmailOnlyAuthModalProps> = ({ isOpen, onClose
             ×
           </button>
 
-          <h2 className="modal-title">
-            {needsPassword ? 'Enter Your Password' : 'Log In to Continue'}
-          </h2>
+          <h2 className="modal-title">Log In to Continue</h2>
           <p className="modal-subtitle">
-            {needsPassword
-              ? 'Enter your password to access the event'
-              : 'Enter your email to quickly access the event'}
+            Enter your email and we'll send you a magic link to log in instantly
           </p>
 
-          {!needsPassword ? (
-            <form onSubmit={handleEmailSubmit} className="auth-form">
-              <div className="form-group">
-                <label htmlFor="email">Email</label>
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  autoFocus
-                />
-              </div>
+          <form onSubmit={handleEmailSubmit} className="auth-form">
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                autoFocus
+                disabled={loading || !!message}
+              />
+            </div>
 
-              {error && <div className="error-message">{error}</div>}
-              {message && <div className="success-message">{message}</div>}
+            {error && <div className="error-message">{error}</div>}
+            {message && <div className="success-message">{message}</div>}
 
-              <button type="submit" className="submit-button" disabled={loading}>
-                {loading ? 'Processing...' : 'Continue'}
-              </button>
+            <button type="submit" className="submit-button" disabled={loading || !!message}>
+              {loading ? 'Sending...' : message ? 'Link Sent!' : 'Send Magic Link'}
+            </button>
 
-              <p className="info-text">
-                If you already have an account, we'll log you in. Otherwise, we'll create one for you.
-              </p>
-            </form>
-          ) : (
-            <form onSubmit={handlePasswordSubmit} className="auth-form">
-              <div className="form-group">
-                <label htmlFor="email-display">Email</label>
-                <input
-                  type="email"
-                  id="email-display"
-                  value={email}
-                  disabled
-                  className="disabled-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="password">Password</label>
-                <input
-                  type="password"
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  autoFocus
-                  minLength={6}
-                />
-              </div>
-
-              {error && <div className="error-message">{error}</div>}
-              {message && <div className="success-message">{message}</div>}
-
-              <button type="submit" className="submit-button" disabled={loading}>
-                {loading ? 'Logging in...' : 'Log In'}
-              </button>
-
-              <button
-                type="button"
-                className="back-button-text"
-                onClick={handleBack}
-              >
-                ← Use different email
-              </button>
-            </form>
-          )}
+            <p className="info-text">
+              No password needed! We'll send you a secure link to log in. If you don't have an account, we'll create one for you automatically.
+            </p>
+          </form>
         </div>
       </div>
 
@@ -334,20 +247,6 @@ const EmailOnlyAuthModal: React.FC<EmailOnlyAuthModalProps> = ({ isOpen, onClose
           color: #657786;
           margin: 0;
           line-height: 1.4;
-        }
-
-        .back-button-text {
-          background: none;
-          border: none;
-          color: #667eea;
-          font-size: 14px;
-          cursor: pointer;
-          text-align: center;
-          padding: 8px;
-        }
-
-        .back-button-text:hover {
-          text-decoration: underline;
         }
 
         @media (max-width: 480px) {

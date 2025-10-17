@@ -11,14 +11,21 @@ interface Comment {
   createdAt: string;
 }
 
+interface User {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
 interface CommentModalProps {
   postId: string;
   token?: string;
   isOpen: boolean;
   onClose: () => void;
+  user: User | null;
 }
 
-const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onClose }) => {
+const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onClose, user }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,10 +45,21 @@ const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onCl
           ...(token && { Authorization: `Bearer ${token}` })
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        setComments(data);
+        // Map API response to Comment interface
+        const mappedComments = (data.comments || []).map((c: any) => ({
+          id: c.id,
+          content: c.content,
+          author: {
+            id: c.authorId,
+            name: c.authorName,
+            avatar: c.authorAvatar
+          },
+          createdAt: c.createdAt
+        }));
+        setComments(mappedComments);
       }
     } catch (error) {
       console.error('Failed to fetch comments:', error);
@@ -52,8 +70,8 @@ const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onCl
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newComment.trim() || !token) return;
+
+    if (!newComment.trim() || !token || !user) return;
 
     setSubmitting(true);
 
@@ -62,8 +80,9 @@ const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onCl
       id: `temp-${Date.now()}`,
       content: newComment.trim(),
       author: {
-        id: 'current-user',
-        name: 'You'
+        id: user.id,
+        name: user.name,
+        avatar: user.avatar
       },
       createdAt: new Date().toISOString()
     };
@@ -78,14 +97,30 @@ const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onCl
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ content: optimisticComment.content })
+        body: JSON.stringify({
+          content: optimisticComment.content,
+          authorId: user.id,
+          authorName: user.name,
+          authorAvatar: user.avatar || '👤'
+        })
       });
 
       if (response.ok) {
-        const newCommentData = await response.json();
+        const data = await response.json();
+        // Map the response to Comment interface
+        const newCommentData: Comment = {
+          id: data.comment.id,
+          content: data.comment.content,
+          author: {
+            id: data.comment.authorId,
+            name: data.comment.authorName,
+            avatar: data.comment.authorAvatar
+          },
+          createdAt: data.comment.createdAt
+        };
         // Replace optimistic comment with real data
-        setComments(prev => 
-          prev.map(comment => 
+        setComments(prev =>
+          prev.map(comment =>
             comment.id === optimisticComment.id ? newCommentData : comment
           )
         );
@@ -160,7 +195,7 @@ const CommentModal: React.FC<CommentModalProps> = ({ postId, token, isOpen, onCl
         </div>
 
         {/* Comment Form */}
-        {token && (
+        {token && user && (
           <div className="p-4 border-t">
             <form onSubmit={handleSubmitComment} className="flex space-x-3">
               <textarea

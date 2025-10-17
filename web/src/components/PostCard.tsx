@@ -19,13 +19,20 @@ interface Post {
   }[];
 }
 
+interface User {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
 interface PostCardProps {
   post: Post;
   token?: string;
   onLike: () => void;
+  user?: User | null;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post, token, onLike }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, token, onLike, user = null }) => {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
 
   const formatDate = (dateString: string) => {
@@ -160,6 +167,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, token, onLike }) => {
         token={token}
         isOpen={isCommentModalOpen}
         onClose={() => setIsCommentModalOpen(false)}
+        user={user}
       />
     </>
   );
